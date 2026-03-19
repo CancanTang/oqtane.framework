@@ -17,12 +17,12 @@ namespace Oqtane.Controllers
             _jobLogs = jobLogs;
         }
 
-        // GET: api/<controller>?jobid=x
+        // GET: api/<controller>
         [HttpGet]
         [Authorize(Roles = RoleNames.Host)]
-        public IEnumerable<JobLog> Get(string jobid)
+        public IEnumerable<JobLog> Get()
         {
-            return _jobLogs.GetJobLogs(int.Parse(jobid));
+            return _jobLogs.GetJobLogs();
         }
 
         // GET api/<controller>/5

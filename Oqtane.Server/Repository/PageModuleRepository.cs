@@ -1,23 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Policy;
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Oqtane.Extensions;
 using Oqtane.Models;
 using Oqtane.Shared;
 
 namespace Oqtane.Repository
 {
-    public interface IPageModuleRepository
-    {
-        IEnumerable<PageModule> GetPageModules(int siteId);
-        PageModule AddPageModule(PageModule pageModule);
-        PageModule UpdatePageModule(PageModule pageModule);
-        PageModule GetPageModule(int pageModuleId);
-        PageModule GetPageModule(int pageModuleId, bool tracking);
-        PageModule GetPageModule(int pageId, int moduleId);
-        void DeletePageModule(int pageModuleId);
-    }
-
     public class PageModuleRepository : IPageModuleRepository
     {
         private readonly IDbContextFactory<TenantDBContext> _dbContextFactory;
@@ -99,7 +89,6 @@ namespace Oqtane.Repository
                 var permissions = _permissions.GetPermissions(pagemodule.Module.SiteId, EntityNames.Module).ToList();
                 pagemodule = GetPageModule(pagemodule, moduledefinitions, permissions);
             }
-            pagemodule.Module.IsShared = db.PageModule.Count(item => item.ModuleId == pagemodule.ModuleId) > 1;
             return pagemodule;
         }
 

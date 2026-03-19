@@ -61,19 +61,19 @@ namespace Oqtane.Databases
 
         public abstract IDataReader ExecuteReader(string connectionString, string query);
 
-        public virtual string DelimitName(string name)
-        {
-            return name;
-        }
-
         public virtual string RewriteName(string name)
         {
             return name;
         }
 
-        public virtual string RewriteValue(object value)
+        public virtual string RewriteName(string name, bool isQuery)
         {
-            return value.ToString();
+            return name;
+        }
+
+        public virtual string RewriteValue(string value, string type)
+        {
+            return value;
         }
 
         public virtual void UpdateIdentityStoreTableNames(ModelBuilder builder)

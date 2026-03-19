@@ -15,8 +15,6 @@ namespace Oqtane.Themes
 {
     public abstract class ThemeBase : ComponentBase, IThemeControl
     {
-        private bool _scriptsloaded = false;
-
         [Inject]
         protected ILogService LoggingService { get; set; }
 
@@ -43,21 +41,18 @@ namespace Oqtane.Themes
             {
                 List<Resource> resources = null;
                 var type = GetType();
-                if (type.IsSubclassOf(typeof(ThemeBase)))
+                if (type.BaseType == typeof(ThemeBase))
                 {
-                    if (type.IsSubclassOf(typeof(ThemeControlBase)) || type.IsSubclassOf(typeof(ContainerBase)))
+                    if (PageState.Page.Resources != null)
                     {
-                        if (Resources != null)
-                        {
-                            resources = Resources.Where(item => item.ResourceType == ResourceType.Script).ToList();
-                        }
+                        resources = PageState.Page.Resources.Where(item => item.ResourceType == ResourceType.Script && item.Level == ResourceLevel.Page && item.Namespace == type.Namespace).ToList();
                     }
-                    else // ThemeBase
+                }
+                else // themecontrolbase, containerbase
+                {
+                    if (Resources != null)
                     {
-                        if (PageState.Page.Resources != null)
-                        {
-                            resources = PageState.Page.Resources.Where(item => item.ResourceType == ResourceType.Script && item.Level == ResourceLevel.Page && item.Namespace == type.Namespace).ToList();
-                        }
+                        resources = Resources.Where(item => item.ResourceType == ResourceType.Script).ToList();
                     }
                 }
                 if (resources != null && resources.Any())
@@ -72,12 +67,12 @@ namespace Oqtane.Themes
                             if (!string.IsNullOrEmpty(resource.Url))
                             {
                                 var url = (resource.Url.Contains("://")) ? resource.Url : PageState.Alias.BaseUrl + resource.Url;
-                                scripts.Add(new { href = url, type = resource.Type ?? "", bundle = resource.Bundle ?? "", integrity = resource.Integrity ?? "", crossorigin = resource.CrossOrigin ?? "", location = resource.Location.ToString().ToLower(), dataAttributes = resource.DataAttributes });
+                                scripts.Add(new { href = url, bundle = resource.Bundle ?? "", integrity = resource.Integrity ?? "", crossorigin = resource.CrossOrigin ?? "", es6module = resource.ES6Module, location = resource.Location.ToString().ToLower() });
                             }
                             else
                             {
                                 inline += 1;
-                                await interop.IncludeScript(GetType().Namespace.ToLower() + inline.ToString(), "", "", "", resource.Type ?? "", resource.Content, resource.Location.ToString().ToLower());
+                                await interop.IncludeScript(GetType().Namespace.ToLower() + inline.ToString(), "", "", "", resource.Content, resource.Location.ToString().ToLower());
                             }
                         }
                     }
@@ -87,55 +82,17 @@ namespace Oqtane.Themes
                     }
                 }
             }
-            _scriptsloaded = true;
         }
 
-        public bool ScriptsLoaded
-        {
-            get
-            {
-                return _scriptsloaded;
-            }
-        }
-
-        // property for obtaining theme information about this theme component
-        public Theme ThemeState
-        {
-            get
-            {
-                var type = GetType().Namespace + ", " + GetType().Assembly.GetName().Name;
-                return PageState?.Site.Themes.FirstOrDefault(item => item.ThemeName == type);
-            }
-        }
-
-        // path methods
+        // path method
 
         public string ThemePath()
         {
             return PageState?.Alias.BaseUrl + "/Themes/" + GetType().Namespace + "/";
         }
 
-        public string StaticAssetPath
-        {
-            get
-            {
-                // requires theme to have implemented ITheme
-                return PageState?.Alias.BaseUrl + "_content/" + ThemeState?.PackageName + "/";
-            }
-        }
-
-        // fingerprint hash code for static assets
-        public string Fingerprint
-        {
-            get
-            {
-                return ThemeState.Fingerprint;
-            }
-        }
-
         // url methods
 
-        // navigate url
         public string NavigateUrl()
         {
             return NavigateUrl(PageState.Page.Path);
@@ -151,78 +108,31 @@ namespace Oqtane.Themes
             return NavigateUrl(PageState.Page.Path, refresh);
         }
 
-        public string NavigateUrl(string path, string querystring)
-        {
-            return Utilities.NavigateUrl(PageState.Alias.Path, path, querystring);
-        }
-
-        public string NavigateUrl(string path, Dictionary<string, string> querystring)
-        {
-            return NavigateUrl(path, Utilities.CreateQueryString(querystring));
-        }
-
         public string NavigateUrl(string path, bool refresh)
         {
-            return NavigateUrl(path, refresh ? "refresh" : "");
+            return Utilities.NavigateUrl(PageState.Alias.Path, path, refresh ? "refresh" : "");
         }
 
-        public string NavigateUrl(int moduleid, string action)
+        public string NavigateUrl(string path, string parameters)
         {
-            return EditUrl(moduleid, action, "");
+            return Utilities.NavigateUrl(PageState.Alias.Path, path, parameters);
         }
 
-        public string NavigateUrl(int moduleid, string action, string querystring)
-        {
-            return EditUrl(PageState.Page.Path, moduleid, action, querystring);
-        }
-
-        public string NavigateUrl(int moduleid, string action, Dictionary<string, string> querystring)
-        {
-            return EditUrl(PageState.Page.Path, moduleid, action, Utilities.CreateQueryString(querystring));
-        }
-
-        public string NavigateUrl(string path, int moduleId, string action)
-        {
-            return EditUrl(path, moduleId, action, "");
-        }
-
-        public string NavigateUrl(string path, int moduleid, string action, string querystring)
-        {
-            return EditUrl(path, moduleid, action, querystring);
-        }
-
-        public string NavigateUrl(string path, int moduleid, string action, Dictionary<string, string> querystring)
-        {
-            return EditUrl(path, moduleid, action, querystring);
-        }
-
-        // edit url
         public string EditUrl(int moduleid, string action)
         {
             return EditUrl(moduleid, action, "");
         }
 
-        public string EditUrl(int moduleid, string action, string querystring)
+        public string EditUrl(int moduleid, string action, string parameters)
         {
-            return EditUrl(PageState.Page.Path, moduleid, action, querystring);
+            return EditUrl(PageState.Page.Path, moduleid, action, parameters);
         }
 
-        public string EditUrl(int moduleid, string action, Dictionary<string, string> querystring)
+        public string EditUrl(string path, int moduleid, string action, string parameters)
         {
-            return EditUrl(PageState.Page.Path, moduleid, action, querystring);
+            return Utilities.EditUrl(PageState.Alias.Path, path, moduleid, action, parameters);
         }
 
-        public string EditUrl(string path, int moduleid, string action, string querystring)
-        {
-            return Utilities.EditUrl(PageState.Alias.Path, path, moduleid, action, querystring);
-        }
-
-        public string EditUrl(string path, int moduleid, string action, Dictionary<string, string> querystring)
-        {
-            return EditUrl(path, moduleid, action, Utilities.CreateQueryString(querystring));
-        }
-
-        // file url
         public string FileUrl(string folderpath, string filename)
         {
             return FileUrl(folderpath, filename, false);
@@ -242,7 +152,6 @@ namespace Oqtane.Themes
             return Utilities.FileUrl(PageState.Alias, fileid, download);
         }
 
-        // image url
         public string ImageUrl(int fileid, int width, int height)
         {
             return ImageUrl(fileid, width, height, "");

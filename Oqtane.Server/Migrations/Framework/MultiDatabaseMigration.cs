@@ -12,19 +12,14 @@ namespace Oqtane.Migrations
 
         protected IDatabase ActiveDatabase { get; }
 
-        protected string DelimitName(string name)
-        {
-            return ActiveDatabase.DelimitName(name);
-        }
-
         protected string RewriteName(string name)
         {
-            return ActiveDatabase.RewriteName(name);
+            return ActiveDatabase.RewriteName(name, false);
         }
 
-        protected string RewriteValue(object value)
+        protected string RewriteName(string name, bool isQuery)
         {
-            return ActiveDatabase.RewriteValue(value);
+            return ActiveDatabase.RewriteName(name, isQuery);
         }
     }
 }

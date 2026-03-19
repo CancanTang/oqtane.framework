@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Oqtane.Models;
 using Microsoft.AspNetCore.Identity;
 using System;
 

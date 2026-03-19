@@ -6,8 +6,6 @@ namespace Oqtane.Models
 
         public string Message { get; set; }
 
-        public Result() {}
-
         public Result(bool success)
         {
             Success = success;

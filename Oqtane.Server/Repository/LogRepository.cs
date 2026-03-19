@@ -6,14 +6,6 @@ using Oqtane.Models;
 
 namespace Oqtane.Repository
 {
-    public interface ILogRepository
-    {
-        IEnumerable<Log> GetLogs(int siteId, string level, string function, int rows);
-        Log GetLog(int logId);
-        void AddLog(Log log);
-        int DeleteLogs(int siteId, int age);
-    }
-
     public class LogRepository : ILogRepository
     {
         private readonly IDbContextFactory<TenantDBContext> _dbContextFactory;
@@ -56,12 +48,6 @@ namespace Oqtane.Repository
 
         public void AddLog(Log log)
         {
-            if (log.Url.Length > 2048) log.Url = log.Url.Substring(0, 2048);
-            if (log.Server.Length > 200) log.Server = log.Server.Substring(0, 200);
-            if (log.Category.Length > 200) log.Category = log.Category.Substring(0, 200);
-            if (log.Feature.Length > 200) log.Feature = log.Feature.Substring(0, 200);
-            if (log.Function.Length > 20) log.Function = log.Function.Substring(0, 20);
-            if (log.Level.Length > 20) log.Level = log.Level.Substring(0, 20);
             using var db = _dbContextFactory.CreateDbContext();
             db.Log.Add(log);
             db.SaveChanges();

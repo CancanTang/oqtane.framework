@@ -1,31 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Oqtane.Extensions;
+using Oqtane.Infrastructure;
 using Oqtane.Models;
 using Oqtane.Shared;
 
 namespace Oqtane.Repository
 {
-    public interface ISearchContentRepository
-    {
-        Task<IEnumerable<SearchContent>> GetSearchContentsAsync(SearchQuery searchQuery);
-        SearchContent AddSearchContent(SearchContent searchContent);
-        void DeleteSearchContent(int searchContentId);
-        void DeleteSearchContent(string entityName, string entryId);
-        void DeleteSearchContent(string uniqueKey);
-        void DeleteAllSearchContent(int siteId);
-
-        SearchWord GetSearchWord(string word);
-        SearchWord AddSearchWord(SearchWord searchWord);
-
-        IEnumerable<SearchContentWord> GetSearchContentWords(int searchContentId);
-        SearchContentWord AddSearchContentWord(SearchContentWord searchContentWord);
-        SearchContentWord UpdateSearchContentWord(SearchContentWord searchContentWord);
-    }
-
     public class SearchContentRepository : ISearchContentRepository
     {
         private readonly IDbContextFactory<TenantDBContext> _dbContextFactory;
@@ -166,17 +152,11 @@ namespace Oqtane.Repository
             }
         }
 
-        public void DeleteAllSearchContent(int siteId)
+        public void DeleteAllSearchContent()
         {
             using var db = _dbContextFactory.CreateDbContext();
-            // delete in batches of 100 records
-            var searchContents = db.SearchContent.Where(item => item.SiteId == siteId).Take(100).ToList();
-            while (searchContents.Count > 0)
-            {
-                db.SearchContent.RemoveRange(searchContents);
-                db.SaveChanges();
-                searchContents = db.SearchContent.Where(item => item.SiteId == siteId).Take(100).ToList();
-            }
+            db.SearchContent.RemoveRange(db.SearchContent);
+            db.SaveChanges();
         }
 
         public SearchWord GetSearchWord(string word)

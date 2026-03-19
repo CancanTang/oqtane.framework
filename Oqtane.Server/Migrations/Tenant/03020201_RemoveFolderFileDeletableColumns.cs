@@ -16,18 +16,15 @@ namespace Oqtane.Migrations.Tenant
 
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            if (ActiveDatabase.Name != "Sqlite")
-            {
-                var folderEntityBuilder = new FolderEntityBuilder(migrationBuilder, ActiveDatabase);
-                folderEntityBuilder.DropColumn("DeletedBy");
-                folderEntityBuilder.DropColumn("DeletedOn");
-                folderEntityBuilder.DropColumn("IsDeleted");
+            var folderEntityBuilder = new FolderEntityBuilder(migrationBuilder, ActiveDatabase);
+            folderEntityBuilder.DropColumn("DeletedBy");
+            folderEntityBuilder.DropColumn("DeletedOn");
+            folderEntityBuilder.DropColumn("IsDeleted");
 
-                var fileEntityBuilder = new FileEntityBuilder(migrationBuilder, ActiveDatabase);
-                fileEntityBuilder.DropColumn("DeletedBy");
-                fileEntityBuilder.DropColumn("DeletedOn");
-                fileEntityBuilder.DropColumn("IsDeleted");
-            }
+            var fileEntityBuilder = new FileEntityBuilder(migrationBuilder, ActiveDatabase);
+            fileEntityBuilder.DropColumn("DeletedBy");
+            fileEntityBuilder.DropColumn("DeletedOn");
+            fileEntityBuilder.DropColumn("IsDeleted");
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)

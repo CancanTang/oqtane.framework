@@ -1,11 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
 	<PropertyGroup>
-    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
-		<!-- Uncomment to also build android, ios, and maccatalyst -->
-    <!-- <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks> -->
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net8.0-windows10.0.19041.0</TargetFrameworks>
+		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
+    <!-- <TargetFrameworks>net8.0-android;net8.0-ios;net8.0-maccatalyst</TargetFrameworks> -->
+		<!-- <TargetFrameworks>$(TargetFrameworks);net8.0-tizen</TargetFrameworks> -->
 		<OutputType>Exe</OutputType>
-		<RootNamespace>Oqtane.Maui</RootNamespace>
+    <Version>5.2.1</Version>
+    <Product>Oqtane</Product>
+    <Authors>Shaun Walker</Authors>
+    <Company>.NET Foundation</Company>
+    <Description>Modular Application Framework for Blazor and MAUI</Description>
+    <Copyright>.NET Foundation</Copyright>
+    <PackageProjectUrl>https://www.oqtane.org</PackageProjectUrl>
+    <PackageLicenseUrl>https://github.com/oqtane/oqtane.framework/blob/dev/LICENSE</PackageLicenseUrl>
+    <PackageReleaseNotes>https://github.com/oqtane/oqtane.framework/releases/tag/v5.2.1</PackageReleaseNotes>
+    <RepositoryUrl>https://github.com/oqtane/oqtane.framework</RepositoryUrl>
+    <RepositoryType>Git</RepositoryType>
+    <RootNamespace>Oqtane.Maui</RootNamespace>
 		<UseMaui>true</UseMaui>
 		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
@@ -16,19 +28,18 @@
 
 		<!-- App Identifier -->
 		<ApplicationId>com.oqtane.maui</ApplicationId>
+		<ApplicationIdGuid>0E29FC31-1B83-48ED-B6E0-9F3C67B775D4</ApplicationIdGuid>
     
 		<!-- Versions -->
-		<ApplicationDisplayVersion>10.1.1</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>5.2.1</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 
-		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
-		<WindowsPackageType>None</WindowsPackageType>
-    
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">14.2</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">14.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -36,13 +47,13 @@
 		<MauiIcon Include="Resources\AppIcon\appicon.svg" />
 
 		<!-- Splash Screen -->
-		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+    <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
 
-		<!-- Images -->
+    <!-- Images -->
 		<MauiImage Include="Resources\Images\*" />
-		<MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
+    <MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
 
-		<!-- Custom Fonts -->
+    <!-- Custom Fonts -->
 		<MauiFont Include="Resources\Fonts\*" />
 
 		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
@@ -53,24 +64,25 @@
 	  <None Remove="Platforms\Android\Resources\xml\network_security_config.xml" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.3" />
-		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.3" />
-		<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.3" />
-		<PackageReference Include="Microsoft.Extensions.Localization" Version="10.0.3" />
-		<PackageReference Include="System.Net.Http.Json" Version="10.0.3" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
-		<PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
-	</ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="8.0.8" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.8" />
+    <PackageReference Include="Microsoft.AspNetCore.Localization" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Localization" Version="8.0.8" />
+    <PackageReference Include="System.Net.Http.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.80" />
+    <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.80" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="8.0.80" />
+  </ItemGroup>
 
-	<ItemGroup>
-		<Reference Include="Oqtane.Client">
-			<HintPath>..\Oqtane.Server\bin\Debug\net10.0\Oqtane.Client.dll</HintPath>
-		</Reference>
-		<Reference Include="Oqtane.Shared">
-			<HintPath>..\Oqtane.Server\bin\Debug\net10.0\Oqtane.Shared.dll</HintPath>
-		</Reference>
-	</ItemGroup>
+  <ItemGroup>
+    <Reference Include="Oqtane.Client">
+      <HintPath>..\Oqtane.Server\bin\Debug\net8.0\Oqtane.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="Oqtane.Shared">
+      <HintPath>..\Oqtane.Server\bin\Debug\net8.0\Oqtane.Shared.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 
 </Project>

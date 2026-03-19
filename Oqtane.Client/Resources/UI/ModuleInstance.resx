@@ -124,9 +124,6 @@
     <value>Module Type Is Invalid For {0}</value>
   </data>
   <data name="Error.Module.Exception" xml:space="preserve">
-    <value>An Unexpected Error Has Occurred</value>
-  </data>
-  <data name="Error.Module.InvalidInjectedServices" xml:space="preserve">
-    <value>Missing service(s): {0}. Please make sure they have been registered correctly.</value>
+      <value>An Unexpected Error Has Occurred</value>
   </data>
 </root>

@@ -11,7 +11,7 @@ namespace Oqtane.Services
         Task<List<SearchResult>> GetSearchResultsAsync(SearchQuery searchQuery);
 
         Task SaveSearchContent(SearchContent searchContent, Dictionary<string, string> siteSettings);
-
-        Task DeleteSearchContent(int siteId);
+        
+        Task ResetIndex();
     }
 }

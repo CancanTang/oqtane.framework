@@ -1,21 +1,11 @@
 var Oqtane = Oqtane || {};
 
 Oqtane.Interop = {
-    setCookie: function (name, value, days, secure, sameSite) {
+    setCookie: function (name, value, days) {
         var d = new Date();
         d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
         var expires = "expires=" + d.toUTCString();
-        var cookieString = name + "=" + value + ";" + expires + ";path=/";
-        if (secure) {
-            cookieString += "; secure";
-        }
-        if (sameSite === "Lax" || sameSite === "Strict" || sameSite === "None") {
-            cookieString += "; SameSite=" + sameSite;
-        }
-        document.cookie = cookieString;
-    },
-    setCookieString: function (cookieString) {
-        document.cookie = cookieString;
+        document.cookie = name + "=" + value + ";" + expires + ";path=/";
     },
     getCookie: function (name) {
         name = name + "=";
@@ -123,24 +113,15 @@ Oqtane.Interop = {
             this.includeLink(links[i].id, links[i].rel, links[i].href, links[i].type, links[i].integrity, links[i].crossorigin, links[i].insertbefore);
         }
     },
-    includeScript: function (id, src, integrity, crossorigin, type, content, location, dataAttributes) {
-        var script = null;
+    includeScript: function (id, src, integrity, crossorigin, type, content, location) {
+        var script;
         if (src !== "") {
             script = document.querySelector("script[src=\"" + CSS.escape(src) + "\"]");
         }
         else {
-            if (id !== "") {
-                script = document.getElementById(id);
-            } else {
-                const scripts = document.querySelectorAll("script:not([src])");
-                for (let i = 0; i < scripts.length; i++) {
-                    if (scripts[i].textContent.includes(content)) {
-                        script = scripts[i];
-                    }
-                }
-            }
+            script = document.getElementById(id);
         }
-        if (script instanceof HTMLScriptElement) {
+        if (script !== null) {
             script.remove();
             script = null;
         }
@@ -164,36 +145,37 @@ Oqtane.Interop = {
             else {
                 script.innerHTML = content;
             }
-            if (dataAttributes !== null) {
-                for (var key in dataAttributes) {
-                    script.setAttribute(key, dataAttributes[key]);
-                }
-            }
-
-            try {
-                this.addScript(script, location);
-            } catch (error) {
-                if (src !== "") {
-                    console.error("Failed to load external script: ${src}", error);
-                } else {
-                    console.error("Failed to load inline script: ${content}", error);
-                }
-            }
+            script.async = false;
+            this.addScript(script, location)
+                .then(() => {
+                    if (src !== "") {
+                        console.log(src + ' loaded');
+                    }
+                    else {
+                        console.log(id + ' loaded');
+                    }
+                })
+                .catch(() => {
+                    if (src !== "") {
+                        console.error(src + ' failed');
+                    }
+                    else {
+                        console.error(id + ' failed');
+                    }
+                });
         }
     },
     addScript: function (script, location) {
-        return new Promise((resolve, reject) => {
-            script.async = false;
-            script.defer = false;
+        if (location === 'head') {
+            document.head.appendChild(script);
+        }
+        if (location === 'body') {
+            document.body.appendChild(script);
+        }
 
-            script.onload = () => resolve();
-            script.onerror = (error) => reject(error);
-
-            if (location === 'head') {
-                document.head.appendChild(script);
-            } else {
-                document.body.appendChild(script);
-            }
+        return new Promise((res, rej) => {
+            script.onload = res();
+            script.onerror = rej();
         });
     },
     includeScripts: async function (scripts) {
@@ -216,9 +198,7 @@ Oqtane.Interop = {
             }
             promises.push(new Promise((resolve, reject) => {
                 if (loadjs.isDefined(bundles[b])) {
-                    loadjs.ready(bundles[b], () => {
-                        resolve(true);
-                    });
+                    resolve(true);
                 }
                 else {
                     loadjs(urls, bundles[b], {
@@ -226,25 +206,18 @@ Oqtane.Interop = {
                         returnPromise: true,
                         before: function (path, element) {
                             for (let s = 0; s < scripts.length; s++) {
-                                if (path === scripts[s].href) {
-                                    if (scripts[s].integrity !== '') {
-                                        element.integrity = scripts[s].integrity;
-                                    }
-                                    if (scripts[s].crossorigin !== '') {
-                                        element.crossOrigin = scripts[s].crossorigin;
-                                    }
-                                    if (scripts[s].type !== '') {
-                                        element.type = scripts[s].type;
-                                    }
-                                    if (scripts[s].dataAttributes !== null) {
-                                        for (var key in scripts[s].dataAttributes) {
-                                            element.setAttribute(key, scripts[s].dataAttributes[key]);
-                                        }
-                                    }
-                                    if (scripts[s].location === 'body') {
-                                        document.body.appendChild(element);
-                                        return false;  // return false to bypass default DOM insertion mechanism
-                                    }
+                                if (path === scripts[s].href && scripts[s].integrity !== '') {
+                                    element.integrity = scripts[s].integrity;
+                                }
+                                if (path === scripts[s].href && scripts[s].crossorigin !== '') {
+                                    element.crossOrigin = scripts[s].crossorigin;
+                                }
+                                if (path === scripts[s].href && scripts[s].es6module === true) {
+                                    element.type = "module";
+                                }
+                                if (path === scripts[s].href && scripts[s].location === 'body') {
+                                    document.body.appendChild(element);
+                                    return false;  // return false to bypass default DOM insertion mechanism
                                 }
                             }
                         }
@@ -311,113 +284,81 @@ Oqtane.Interop = {
         }
         return files;
     },
-    uploadFiles: async function (posturl, folder, id, antiforgerytoken, jwt, chunksize, anonymizeuploadfilenames) {
-        var success = true;
+    uploadFiles: function (posturl, folder, id, antiforgerytoken, jwt) {
         var fileinput = document.getElementById('FileInput_' + id);
+        var files = fileinput.files;
         var progressinfo = document.getElementById('ProgressInfo_' + id);
         var progressbar = document.getElementById('ProgressBar_' + id);
 
-        var totalSize = 0;
-        for (var i = 0; i < fileinput.files.length; i++) {
-            totalSize += fileinput.files[i].size;
-        }
-        let uploadSize = 0;
-
-        if (!chunksize || chunksize < 1) {
-            chunksize = 1; // 1 MB default
-        }
-
         if (progressinfo !== null && progressbar !== null) {
-            progressinfo.setAttribute('style', 'display: inline;');
-            if (fileinput.files.length > 1) {
-                progressinfo.innerHTML = fileinput.files[0].name + ', ...';
-            }
-            else {
-                progressinfo.innerHTML = fileinput.files[0].name;
-            }
-            progressbar.setAttribute('style', 'width: 100%; display: inline;');
-            progressbar.value = 0;
+            progressinfo.setAttribute("style", "display: inline;");
+            progressbar.setAttribute("style", "width: 100%; display: inline;");
         }
 
-        const uploadFile = (file) => {
-            const chunkSize = chunksize * (1024 * 1024);
-            const totalParts = Math.ceil(file.size / chunkSize);
-            let partCount = 0;
+        for (var i = 0; i < files.length; i++) {
+            var FileChunk = [];
+            var file = files[i];
+            var MaxFileSizeMB = 1;
+            var BufferChunkSize = MaxFileSizeMB * (1024 * 1024);
+            var FileStreamPos = 0;
+            var EndPos = BufferChunkSize;
+            var Size = file.size;
 
-            let filename = file.name;
-            if (anonymizeuploadfilenames) {
-                filename = crypto.randomUUID() + '.' + filename.split('.').pop();
+            while (FileStreamPos < Size) {
+                FileChunk.push(file.slice(FileStreamPos, EndPos));
+                FileStreamPos = EndPos;
+                EndPos = FileStreamPos + BufferChunkSize;
             }
 
-            const uploadPart = () => {
-                const start = partCount * chunkSize;
-                const end = Math.min(start + chunkSize, file.size);
-                const chunk = file.slice(start, end);
+            var TotalParts = FileChunk.length;
+            var PartCount = 0;
 
-                return new Promise((resolve, reject) => {
+            while (Chunk = FileChunk.shift()) {
+                PartCount++;
+                var FileName = file.name + ".part_" + PartCount.toString().padStart(3, '0') + "_" + TotalParts.toString().padStart(3, '0');
 
-                    let formdata = new FormData();
-                    formdata.append('__RequestVerificationToken', antiforgerytoken);
-                    formdata.append('folder', folder);
-                    formdata.append('formfile', chunk, filename);
-
-                    var credentials = 'same-origin';
-                    var headers = new Headers();
-                    headers.append('PartCount', partCount + 1);
-                    headers.append('TotalParts', totalParts);
-                    if (jwt !== "") {
-                        headers.append('Authorization', 'Bearer ' + jwt);
-                        credentials = 'include';
+                var data = new FormData();
+                data.append('__RequestVerificationToken', antiforgerytoken);
+                data.append('folder', folder);
+                data.append('formfile', Chunk, FileName);
+                var request = new XMLHttpRequest();
+                request.open('POST', posturl, true);
+                if (jwt !== "") {
+                    request.setRequestHeader('Authorization', 'Bearer ' + jwt);
+                    request.withCredentials = true;
+                }
+                request.upload.onloadstart = function (e) {
+                    if (progressinfo !== null && progressbar !== null) {
+                        progressinfo.innerHTML = file.name + ' 0%';
+                        progressbar.value = 0;
                     }
-
-                    return fetch(posturl, {
-                        method: 'POST',
-                        headers: headers,
-                        credentials: credentials,
-                        body: formdata
-                    })
-                        .then(response => {
-                            if (!response.ok) {
-                                if (progressinfo !== null) {
-                                    progressinfo.innerHTML = 'Error: ' + response.statusText;
-                                }
-                                throw new Error('Failed');
-                            }
-                            return;
-                        })
-                        .then(data => {
-                            partCount++;
-                            if (progressbar !== null) {
-                                uploadSize += chunk.size;
-                                var percent = Math.ceil((uploadSize / totalSize) * 100);
-                                progressbar.value = (percent / 100);
-                            }
-                            if (partCount < totalParts) {
-                                uploadPart().then(resolve).catch(reject);
-                            }
-                            else {
-                                resolve(data);
-                            }
-                        })
-                        .catch(error => {
-                            reject(error);
-                        });
-                });
-            };
-
-            return uploadPart();
-        };
-
-        try {
-            for (const file of fileinput.files) {
-                await uploadFile(file);
+                };
+                request.upload.onprogress = function (e) {
+                    if (progressinfo !== null && progressbar !== null) {
+                        var percent = Math.ceil((e.loaded / e.total) * 100);
+                        progressinfo.innerHTML = file.name + '[' + PartCount + '] ' + percent + '%';
+                        progressbar.value = (percent / 100);
+                    }
+                };
+                request.upload.onloadend = function (e) {
+                    if (progressinfo !== null && progressbar !== null) {
+                        progressinfo.innerHTML = file.name + ' 100%';
+                        progressbar.value = 1;
+                    }
+                };
+                request.upload.onerror = function() {
+                    if (progressinfo !== null && progressbar !== null) {
+                        progressinfo.innerHTML = file.name + ' Error: ' + request.statusText;
+                        progressbar.value = 0;
+                    }
+                };
+                request.send(data);
             }
-        } catch (error) {
-            success = false;
-        }
 
-        fileinput.value = '';
-        return success;
+            if (i === files.length - 1) {
+                fileinput.value = '';
+            }
+        }
     },
     refreshBrowser: function (verify, wait) {
         async function attemptReload (verify) {
@@ -444,20 +385,11 @@ Oqtane.Interop = {
         }
     },
     scrollTo: function (top, left, behavior) {
-        const modal = document.querySelector('.modal');
-        if (modal) {
-            modal.scrollTo({
-                top: top,
-                left: left,
-                behavior: behavior
-            });
-        } else {
-            window.scrollTo({
-                top: top,
-                left: left,
-                behavior: behavior
-            });
-        }
+        window.scrollTo({
+            top: top,
+            left: left,
+            behavior: behavior
+        });
     },
     scrollToId: function (id) {
         var element = document.getElementById(id);
@@ -516,17 +448,5 @@ Oqtane.Interop = {
                 }
             }
         }
-    },
-    createCredential: async function (optionsResponse) {
-        const optionsJson = JSON.parse(optionsResponse);
-        const options = PublicKeyCredential.parseCreationOptionsFromJSON(optionsJson);
-        const credential = await navigator.credentials.create({ publicKey: options });
-        return JSON.stringify(credential);
-    },
-    requestCredential: async function (optionsResponse) {
-        const optionsJson = JSON.parse(optionsResponse);
-        const options = PublicKeyCredential.parseRequestOptionsFromJSON(optionsJson);
-        const credential = await navigator.credentials.get({ publicKey: options, undefined });
-        return JSON.stringify(credential);
     }
 };

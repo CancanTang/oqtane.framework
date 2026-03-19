@@ -43,7 +43,7 @@ namespace Oqtane.Models
         public string Path { get; set; }
 
         /// <summary>
-        /// Sorting order of the folder ** not used as folders are sorted in alphabetical order **
+        /// Sorting order of the folder
         /// </summary>
         public int Order { get; set; }
 
@@ -63,9 +63,9 @@ namespace Oqtane.Models
         public bool IsSystem { get; set; }
 
         /// <summary>
-        /// An HTTP Caching Cache-Control directive
+        /// Deprecated - not used
         /// </summary>
-        public string CacheControl { get; set; }
+        public bool? IsDeleted { get; set; }
 
         /// <summary>
         /// TODO: todoc what would this contain?
@@ -102,11 +102,6 @@ namespace Oqtane.Models
                 PermissionList = JsonSerializer.Deserialize<List<Permission>>(value);
             }
         }
-
-        [Obsolete("The IsDeleted property is deprecated. Soft delete of folders is not supported.", false)]
-        [NotMapped]
-        [JsonIgnore] // exclude from API payload
-        public bool? IsDeleted { get; set; }
 
         #endregion
     }

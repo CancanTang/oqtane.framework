@@ -33,7 +33,6 @@ namespace Oqtane.Models
             SettingsType = "";
             PackageName = "";
             Runtimes = "";
-            Databases = "";
             Template = "";
             Resources = null;
             IsAutoEnabled = true;
@@ -66,7 +65,7 @@ namespace Oqtane.Models
         public string Categories { get; set; }
 
         /// <summary>
-        /// Version information of this Module based on the information stored in its assembly
+        /// Version information of this Module based on the DLL / NuGet package.
         /// </summary>
         public string Version { get; set; }
 
@@ -84,10 +83,7 @@ namespace Oqtane.Models
         public string License { get; set; }
 
         [NotMapped]
-        public string Runtimes { get; set; } // comma-delimited list of runtimes ie. Server, WebAssembly
-
-        [NotMapped]
-        public string Databases { get; set; } // comma-delimited list of database names ie. SQLServer, SQLite
+        public string Runtimes { get; set; }
 
         [NotMapped]
         public string Dependencies { get; set; }
@@ -147,9 +143,6 @@ namespace Oqtane.Models
 
         [NotMapped]
         public bool IsPortable { get; set; }
-
-        [NotMapped]
-        public string Fingerprint { get; set; }
 
         #region Deprecated Properties
 

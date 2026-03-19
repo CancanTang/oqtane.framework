@@ -32,21 +32,25 @@ namespace Oqtane.Infrastructure
             var logRepository = provider.GetRequiredService<ILogRepository>();
             var visitorRepository = provider.GetRequiredService<IVisitorRepository>();
             var notificationRepository = provider.GetRequiredService<INotificationRepository>();
-            var urlMappingRepository = provider.GetRequiredService<IUrlMappingRepository>();
-            var siteTaskRepository = provider.GetRequiredService<ISiteTaskRepository>();
+            var installationManager = provider.GetRequiredService<IInstallationManager>();
 
             // iterate through sites for current tenant
             List<Site> sites = siteRepository.GetSites().ToList();
-            foreach (Site site in sites.Where(item => !item.IsDeleted))
+            foreach (Site site in sites)
             {
-                log += "<br />Processing Site: " + site.Name + "<br />";
+                log += "Processing Site: " + site.Name + "<br />";
+                int retention;
                 int count;
 
                 // get site settings
-                var settings = settingRepository.GetSettings(EntityNames.Site, site.SiteId, EntityNames.Host, -1);
+                Dictionary<string, string> settings = GetSettings(settingRepository.GetSettings(EntityNames.Site, site.SiteId).ToList());
 
                 // purge event log
-                var retention = int.Parse(settingRepository.GetSettingValue(settings, "LogRetention", "30")); // 30 day default
+                retention = 30; // 30 days
+                if (settings.ContainsKey("LogRetention") && !string.IsNullOrEmpty(settings["LogRetention"]))
+                {
+                    retention = int.Parse(settings["LogRetention"]);
+                }
                 try
                 {
                     count = logRepository.DeleteLogs(site.SiteId, retention);
@@ -60,7 +64,11 @@ namespace Oqtane.Infrastructure
                 // purge visitors
                 if (site.VisitorTracking)
                 {
-                    retention = int.Parse(settingRepository.GetSettingValue(settings, "VisitorRetention", "30")); // 30 day default
+                    retention = 30; // 30 days
+                    if (settings.ContainsKey("VisitorRetention") && !string.IsNullOrEmpty(settings["VisitorRetention"]))
+                    {
+                        retention = int.Parse(settings["VisitorRetention"]);
+                    }
                     try
                     {
                         count = visitorRepository.DeleteVisitors(site.SiteId, retention);
@@ -73,7 +81,11 @@ namespace Oqtane.Infrastructure
                 }
 
                 // purge notifications
-                retention = int.Parse(settingRepository.GetSettingValue(settings, "NotificationRetention", "30")); // 30 day default
+                retention = 30; // 30 days
+                if (settings.ContainsKey("NotificationRetention") && !string.IsNullOrEmpty(settings["NotificationRetention"]))
+                {
+                    retention = int.Parse(settings["NotificationRetention"]);
+                }
                 try
                 {
                     count = notificationRepository.DeleteNotifications(site.SiteId, retention);
@@ -83,33 +95,30 @@ namespace Oqtane.Infrastructure
                 {
                     log += $"Error Purging Notifications - {ex.Message}<br />";
                 }
+            }
 
-                // purge broken urls 
-                retention = int.Parse(settingRepository.GetSettingValue(settings, "UrlMappingRetention", "30")); // 30 day default
-                try
-                {
-                    count = urlMappingRepository.DeleteUrlMappings(site.SiteId, retention);
-                    log += count.ToString() + " Broken Urls Purged<br />";
-                }
-                catch (Exception ex)
-                {
-                    log += $"Error Purging Broken Urls - {ex.Message}<br />";
-                }
-
-                // purge completed site tasks
-                retention = 30; // 30 day default
-                try
-                {
-                    count = siteTaskRepository.DeleteSiteTasks(site.SiteId, retention);
-                    log += count.ToString() + " Completed Tasks Purged<br />";
-                }
-                catch (Exception ex)
-                {
-                    log += $"Error Purging Completed Site Tasks - {ex.Message}<br />";
-                }
+            // register assemblies
+            try
+            {
+                var assemblies = installationManager.RegisterAssemblies();
+                log += assemblies.ToString() + " Assemblies Registered<br />";
+            }
+            catch (Exception ex)
+            {
+                log += $"Error Registering Assemblies - {ex.Message}<br />";
             }
 
             return log;
+        }
+
+        private Dictionary<string, string> GetSettings(List<Setting> settings)
+        {
+            Dictionary<string, string> dictionary = new Dictionary<string, string>();
+            foreach (Setting setting in settings.OrderBy(item => item.SettingName).ToList())
+            {
+                dictionary.Add(setting.SettingName, setting.SettingValue);
+            }
+            return dictionary;
         }
     }
 }

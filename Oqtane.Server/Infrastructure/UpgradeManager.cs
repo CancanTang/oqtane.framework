@@ -1,37 +1,28 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Localization;
-using Microsoft.Extensions.Logging;
-using Oqtane.Infrastructure.SiteTemplates;
 using Oqtane.Models;
 using Oqtane.Repository;
 using Oqtane.Shared;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 
 namespace Oqtane.Infrastructure
 {
-    public interface IUpgradeManager
-    {
-        void Upgrade(Tenant tenant, string version);
-    }
     public class UpgradeManager : IUpgradeManager
     {
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IWebHostEnvironment _environment;
         private readonly IConfigManager _configManager;
-        private readonly ILogger<UpgradeManager> _filelogger;
 
-        public UpgradeManager(IServiceScopeFactory serviceScopeFactory, IWebHostEnvironment environment, IConfigManager configManager, ILogger<UpgradeManager> filelogger)
+        public UpgradeManager(IServiceScopeFactory serviceScopeFactory, IWebHostEnvironment environment, IConfigManager configManager)
         {
             _serviceScopeFactory = serviceScopeFactory;
             _environment = environment;
             _configManager = configManager;
-            _filelogger = filelogger;
         }
 
         public void Upgrade(Tenant tenant, string version)
@@ -78,30 +69,30 @@ namespace Oqtane.Infrastructure
                     case "5.2.1":
                         Upgrade_5_2_1(tenant, scope);
                         break;
-                    case "6.1.1":
-                        Upgrade_6_1_1(tenant, scope);
-                        break;
-                    case "6.1.5":
-                        Upgrade_6_1_5(tenant, scope);
-                        break;
-                    case "6.2.0":
-                        Upgrade_6_2_0(tenant, scope);
-                        break;
-                    case "6.2.1":
-                        Upgrade_6_2_1(tenant, scope);
-                        break;
-                    case "10.0.4":
-                        Upgrade_10_0_4(tenant, scope);
-                        break;
-                    case "10.1.0":
-                        Upgrade_10_1_0(tenant, scope);
-                        break;
                 }
             }
         }
 
         private void Upgrade_2_0_2(Tenant tenant, IServiceScope scope)
         {
+            if (tenant.Name == TenantNames.Master)
+            {
+                // remove Internal module template files as they are no longer supported
+                var internalTemplatePath = Utilities.PathCombine(_environment.WebRootPath, "Modules", "Templates", "Internal", Path.DirectorySeparatorChar.ToString());
+                if (Directory.Exists(internalTemplatePath))
+                {
+                    try
+                    {
+                        Directory.Delete(internalTemplatePath, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        // error deleting directory
+                        Debug.WriteLine($"Oqtane Error: Error In 2.0.2 Upgrade Logic - {ex}");
+                    }
+                }
+            }
+
             // initialize SiteGuid
             try
             {
@@ -115,7 +106,7 @@ namespace Oqtane.Infrastructure
             catch (Exception ex)
             {
                 // error populating guid
-                _filelogger.LogError(Utilities.LogMessage(this, $"Oqtane Error: Error In 2.0.2 Upgrade Logic - {ex}"));
+                Debug.WriteLine($"Oqtane Error: Error In 2.0.2 Upgrade Logic - {ex}");
             }
         }
 
@@ -283,7 +274,7 @@ namespace Oqtane.Infrastructure
             }
             catch (Exception ex)
             {
-                _filelogger.LogError(Utilities.LogMessage(this, $"Oqtane Error: Error In 3.2.0 Upgrade Logic - {ex}"));
+                Debug.WriteLine($"Oqtane Error: Error In 3.2.0 Upgrade Logic - {ex}");
             }
         }
 
@@ -319,7 +310,7 @@ namespace Oqtane.Infrastructure
             }
             catch (Exception ex)
             {
-                _filelogger.LogError(Utilities.LogMessage(this, $"Oqtane Error: Error In 3.2.1 Upgrade Logic - {ex}"));
+                Debug.WriteLine($"Oqtane Error: Error In 3.2.1 Upgrade Logic - {ex}");
             }
         }
 
@@ -363,7 +354,7 @@ namespace Oqtane.Infrastructure
             }
             catch (Exception ex)
             {
-                _filelogger.LogError(Utilities.LogMessage(this, $"Oqtane Error: Error In 3.3.0 Upgrade Logic - {ex}"));
+                Debug.WriteLine($"Oqtane Error: Error In 3.3.0 Upgrade Logic - {ex}");
             }
         }
 
@@ -380,7 +371,7 @@ namespace Oqtane.Infrastructure
                 try
                 {
                     // delete legacy Views assemblies which will cause startup errors due to missing HostModel
-                    // note that the following files will be deleted however the framework has already started up so another restart will be required
+                    // note that the following files will be deleted however the framework has already started up so a restart will be required
                     var binFolder = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
                     var filepath = Path.Combine(binFolder, "Oqtane.Server.Views.dll");
                     if (System.IO.File.Exists(filepath)) System.IO.File.Delete(filepath);
@@ -390,7 +381,7 @@ namespace Oqtane.Infrastructure
                 catch (Exception ex)
                 {
                     // error deleting file
-                    _filelogger.LogError(Utilities.LogMessage(this, $"Oqtane Error: Error In 5.1.0 Upgrade Logic - {ex}"));
+                    Debug.WriteLine($"Oqtane Error: Error In 5.1.0 Upgrade Logic - {ex}");
                 }
             }
         }
@@ -450,200 +441,6 @@ namespace Oqtane.Infrastructure
             AddPagesToSites(scope, tenant, pageTemplates);
         }
 
-        private void Upgrade_6_1_1(Tenant tenant, IServiceScope scope)
-        {
-            var localizer = scope.ServiceProvider.GetRequiredService<IStringLocalizer<AdminSiteTemplate>>();
-
-            var pageTemplates = new List<PageTemplate>
-            {
-                new PageTemplate
-                {
-                    Name = "Privacy",
-                    Parent = "",
-                    Path = "privacy",
-                    Order = 1011,
-                    Icon = Icons.Eye,
-                    IsNavigation = false,
-                    IsPersonalizable = false,
-                    PermissionList = new List<Permission>
-                    {
-                        new Permission(PermissionNames.View, RoleNames.Everyone, true),
-                        new Permission(PermissionNames.View, RoleNames.Admin, true),
-                        new Permission(PermissionNames.Edit, RoleNames.Admin, true)
-                    },
-                    PageTemplateModules = new List<PageTemplateModule>
-                    {
-                        new PageTemplateModule { ModuleDefinitionName = "Oqtane.Modules.HtmlText, Oqtane.Client", Title = "Privacy Policy", Pane = PaneNames.Default,
-                            PermissionList = new List<Permission> {
-                                new Permission(PermissionNames.View, RoleNames.Everyone, true),
-                                new Permission(PermissionNames.View, RoleNames.Admin, true),
-                                new Permission(PermissionNames.Edit, RoleNames.Admin, true)
-                            },
-                            Settings = new List<Setting> {
-                                new Setting { SettingName = "DynamicTokens", SettingValue = "true" }
-                            },
-                            Content = localizer["Privacy"]
-                        }
-                    }
-                },
-                new PageTemplate
-                {
-                    Name = "Terms",
-                    Parent = "",
-                    Path = "terms",
-                    Order = 1013,
-                    Icon = Icons.List,
-                    IsNavigation = false,
-                    IsPersonalizable = false,
-                    PermissionList = new List<Permission>
-                    {
-                        new Permission(PermissionNames.View, RoleNames.Everyone, true),
-                        new Permission(PermissionNames.View, RoleNames.Admin, true),
-                        new Permission(PermissionNames.Edit, RoleNames.Admin, true)
-                    },
-                    PageTemplateModules = new List<PageTemplateModule>
-                    {
-                        new PageTemplateModule { ModuleDefinitionName = "Oqtane.Modules.HtmlText, Oqtane.Client", Title = "Terms of Use", Pane = PaneNames.Default,
-                            PermissionList = new List<Permission> {
-                                new Permission(PermissionNames.View, RoleNames.Everyone, true),
-                                new Permission(PermissionNames.View, RoleNames.Admin, true),
-                                new Permission(PermissionNames.Edit, RoleNames.Admin, true)
-                            },
-                            Settings = new List<Setting> {
-                                new Setting { SettingName = "DynamicTokens", SettingValue = "true" }
-                            },
-                            Content = localizer["Terms"]
-                        }
-                    }
-                }
-            };
-
-            AddPagesToSites(scope, tenant, pageTemplates);
-        }
-
-        private void Upgrade_6_1_5(Tenant tenant, IServiceScope scope)
-        {
-            // remove Database Providers which were moved to Oqtane.Server
-            string[] assemblies = {
-                "Oqtane.Database.MySQL.dll",
-                "Oqtane.Database.MySQL.pdb",
-                "Oqtane.Database.PostgreSQL.dll",
-                "Oqtane.Database.PostgreSQL.pdb",
-                "Oqtane.Database.Sqlite.dll",
-                "Oqtane.Database.Sqlite.pdb",
-                "Oqtane.Database.SqlServer.dll",
-                "Oqtane.Database.SqlServer.pdb"
-            };
-
-            RemoveAssemblies(tenant, assemblies, "6.1.5");
-        }
-
-        private void Upgrade_6_2_0(Tenant tenant, IServiceScope scope)
-        {
-            var pageTemplates = new List<PageTemplate>
-            {
-                new PageTemplate
-                {
-                    Update = false,
-                    Name = "Setting Management",
-                    Parent = "Admin",
-                    Order = 67,
-                    Path = "admin/settings",
-                    Icon = Icons.Cog,
-                    IsNavigation = false,
-                    IsPersonalizable = false,
-                    PermissionList = new List<Permission>
-                    {
-                        new Permission(PermissionNames.View, RoleNames.Host, true),
-                        new Permission(PermissionNames.Edit, RoleNames.Host, true)
-                    },
-                    PageTemplateModules = new List<PageTemplateModule>
-                    {
-                        new PageTemplateModule
-                        {
-                            ModuleDefinitionName = typeof(Oqtane.Modules.Admin.Settings.Index).ToModuleDefinitionName(), Title = "Setting Management", Pane = PaneNames.Default,
-                            PermissionList = new List<Permission>
-                            {
-                                new Permission(PermissionNames.View, RoleNames.Host, true),
-                                new Permission(PermissionNames.Edit, RoleNames.Host, true)
-                            },
-                            Content = ""
-                        }
-                    }
-                }
-            };
-
-            AddPagesToSites(scope, tenant, pageTemplates);
-        }
-
-        private void Upgrade_6_2_1(Tenant tenant, IServiceScope scope)
-        {
-            // remove text editor files moved to new location
-            string[] files = {
-                "js/quill.min.js.map",
-                "js/quill1.3.7.min.js",
-                "js/quill.min.js",
-                "js/quill-blot-formatter.min.js",
-                "js/quill-interop.js",
-                "css/quill/quill1.3.7.bubble.css",
-                "css/quill/quill.bubble.css",
-                "css/quill/quill1.3.7.snow.css",
-                "css/quill/quill.snow.css",
-                "oqtane-black.png"
-            };
-
-            RemoveFiles(tenant, files, "6.2.1");
-        }
-
-        private void Upgrade_10_0_4(Tenant tenant, IServiceScope scope)
-        {
-            // remove Pomelo.EntityFrameworkCore.MySql package (replaced by MySql.EntityFrameworkCore)
-            string[] assemblies = {
-                "Pomelo.EntityFrameworkCore.MySql.dll"
-            };
-
-            RemoveAssemblies(tenant, assemblies, "10.0.4");
-        }
-
-        private void Upgrade_10_1_0(Tenant tenant, IServiceScope scope)
-        {
-            var pageTemplates = new List<PageTemplate>
-            {
-                new PageTemplate
-                {
-                    Update = false,
-                    Name = "Global Replace",
-                    Parent = "Admin",
-                    Order = 23,
-                    Path = "admin/replace",
-                    Icon = Icons.LoopSquare,
-                    IsNavigation = false,
-                    IsPersonalizable = false,
-                    PermissionList = new List<Permission>
-                    {
-                        new Permission(PermissionNames.View, RoleNames.Admin, true),
-                        new Permission(PermissionNames.Edit, RoleNames.Admin, true)
-                    },
-                    PageTemplateModules = new List<PageTemplateModule>
-                    {
-                        new PageTemplateModule
-                        {
-                            ModuleDefinitionName = typeof(Oqtane.Modules.Admin.GlobalReplace.Index).ToModuleDefinitionName(), Title = "Global Replace", Pane = PaneNames.Default,
-                            PermissionList = new List<Permission>
-                            {
-                                new Permission(PermissionNames.View, RoleNames.Admin, true),
-                                new Permission(PermissionNames.Edit, RoleNames.Admin, true)
-                            },
-                            Content = ""
-                        }
-                    }
-                }
-            };
-
-            AddPagesToSites(scope, tenant, pageTemplates);
-        }
-
-
         private void AddPagesToSites(IServiceScope scope, Tenant tenant, List<PageTemplate> pageTemplates)
         {
             var tenants = scope.ServiceProvider.GetRequiredService<ITenantManager>();
@@ -652,49 +449,6 @@ namespace Oqtane.Infrastructure
             {
                 tenants.SetAlias(tenant.TenantId, site.SiteId);
                 sites.CreatePages(site, pageTemplates, null);
-            }
-        }
-
-        private void RemoveAssemblies(Tenant tenant, string[] assemblies, string version)
-        {
-            // in a development environment assemblies cannot be removed as the debugger runs fron /bin folder and locks the files
-            if (tenant.Name == TenantNames.Master && !_environment.IsDevelopment())
-            {
-                foreach (var assembly in assemblies)
-                {
-                    try
-                    {
-                        var bin = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-                        var filepath = Path.Combine(bin, assembly);
-                        if (System.IO.File.Exists(filepath)) System.IO.File.Delete(filepath);
-                    }
-                    catch (Exception ex)
-                    {
-                        // error deleting asesmbly
-                        _filelogger.LogError(Utilities.LogMessage(this, $"Oqtane Error: {version} Upgrade Error Removing {assembly} - {ex}"));
-                    }
-                }
-            }
-        }
-
-        private void RemoveFiles(Tenant tenant, string[] files, string version)
-        {
-            if (tenant.Name == TenantNames.Master)
-            {
-                foreach (var file in files)
-                {
-                    try
-                    {
-                        var wwwroot = _environment.WebRootPath;
-                        var filepath = Path.Combine(wwwroot, file);
-                        if (System.IO.File.Exists(filepath)) System.IO.File.Delete(filepath);
-                    }
-                    catch (Exception ex)
-                    {
-                        // error deleting file
-                        _filelogger.LogError(Utilities.LogMessage(this, $"Oqtane Error: {version} Upgrade Error Removing {file} - {ex}"));
-                    }
-                }
             }
         }
     }

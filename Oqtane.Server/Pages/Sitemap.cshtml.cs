@@ -7,7 +7,6 @@ using System.Xml;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.Extensions.DependencyInjection;
 using Oqtane.Enums;
 using Oqtane.Infrastructure;
@@ -20,7 +19,6 @@ using Oqtane.Shared;
 namespace Oqtane.Pages
 {
     [AllowAnonymous]
-    [OutputCache(Duration = 300, Tags = [Constants.SitemapOutputCacheTag])]
     public class SitemapModel : PageModel
     {
         private readonly IServiceProvider _serviceProvider;

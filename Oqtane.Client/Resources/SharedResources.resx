@@ -204,9 +204,6 @@
   <data name="System Update" xml:space="preserve">
     <value>System Update</value>
   </data>
-  <data name="Setting Management" xml:space="preserve">
-    <value>Setting Management</value>
-  </data>
   <data name="Download" xml:space="preserve">
     <value>Download</value>
   </data>
@@ -430,7 +427,7 @@
     <value>At Least One Uppercase Letter</value>
   </data>
   <data name="Password.ValidationCriteria" xml:space="preserve">
-    <value>Passwords Must Have A Minimum Length Of {0} Characters, Including At Least {1} Unique Character(s), {2}{3}{4}{5} To Satisfy Password Complexity Requirements For This Site.</value>
+    <value>Passwords Must Have A Minimum Length Of {0} Characters, Including At Least {1} Unique Character(s), {2}{3}{4}{5} To Satisfy Password Compexity Requirements For This Site.</value>
   </data>
   <data name="ProfileInvalid" xml:space="preserve">
     <value>{0} Is Not Valid</value>
@@ -476,14 +473,5 @@
   </data>
   <data name="User" xml:space="preserve">
     <value>User</value>
-  </data>
-  <data name="Path" xml:space="preserve">
-    <value>Path</value>
-  </data>
-  <data name="Installed" xml:space="preserve">
-    <value>Installed</value>
-  </data>
-  <data name="Global Replace" xml:space="preserve">
-    <value>Global Replace</value>
   </data>
 </root>

@@ -10,7 +10,5 @@ namespace Oqtane.Shared {
         public const string AccessDenied = "AccessDenied";
         public const string RemoteFailure = "RemoteFailure";
         public const string ReviewClaims = "ReviewClaims";
-        public const string LoginLinkFailed = "LoginLinkFailed";
-        public const string PasskeyFailed = "PasskeyFailed";
     }
 }

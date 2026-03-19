@@ -10,38 +10,6 @@ using System.Linq;
 
 namespace Oqtane.Services
 {
-    /// <summary>
-    /// Service to manage (install master database / upgrade version / etc.) the installation
-    /// </summary>
-    public interface IInstallationService
-    {
-        /// <summary>
-        /// Returns a status/message object with the current installation state 
-        /// </summary>
-        /// <returns></returns>
-        Task<Installation> IsInstalled();
-
-        /// <summary>
-        /// Starts the installation process 
-        /// </summary>
-        /// <param name="config">connectionString, database type, alias etc.</param>
-        /// <returns>internal status/message object</returns>
-        Task<Installation> Install(InstallConfig config);
-
-        /// <summary>
-        /// Starts the upgrade process
-        /// </summary>
-        /// <param name="backup">indicates if files should be backed up during upgrade</param>
-        /// <returns>internal status/message object</returns>
-        Task<Installation> Upgrade(bool backup);
-
-        /// <summary>
-        /// Restarts the installation
-        /// </summary>
-        /// <returns>internal status/message object</returns>
-        Task RestartAsync();
-    }
-
     [PrivateApi("Don't show in the documentation, as everything should use the Interface")]
     public class InstallationService : ServiceBase, IInstallationService
     {
@@ -79,14 +47,19 @@ namespace Oqtane.Services
             return await PostJsonAsync<InstallConfig,Installation>(ApiUrl, config);
         }
 
-        public async Task<Installation> Upgrade(bool backup)
+        public async Task<Installation> Upgrade()
         {
-            return await GetJsonAsync<Installation>($"{ApiUrl}/upgrade/?backup={backup}");
+            return await GetJsonAsync<Installation>($"{ApiUrl}/upgrade");
         }
 
         public async Task RestartAsync()
         {
             await PostAsync($"{ApiUrl}/restart");
+        }
+
+        public async Task RegisterAsync(string email)
+        {
+            await PostJsonAsync($"{ApiUrl}/register?email={WebUtility.UrlEncode(email)}", true);
         }
     }
 }

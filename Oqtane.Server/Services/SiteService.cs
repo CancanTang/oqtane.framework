@@ -13,7 +13,6 @@ using Oqtane.Enums;
 using Oqtane.Shared;
 using System.Globalization;
 using Oqtane.Extensions;
-using Oqtane.Managers;
 
 namespace Oqtane.Services
 {
@@ -21,71 +20,54 @@ namespace Oqtane.Services
     public class ServerSiteService : ISiteService
     {
         private readonly ISiteRepository _sites;
-        private readonly ISiteGroupMemberRepository _siteGroupMembers;
-        private readonly IAliasRepository _aliases;
         private readonly IPageRepository _pages;
         private readonly IThemeRepository _themes;
         private readonly IPageModuleRepository _pageModules;
         private readonly IModuleDefinitionRepository _moduleDefinitions;
         private readonly ILanguageRepository _languages;
-        private readonly IUserManager _userManager;
         private readonly IUserPermissions _userPermissions;
         private readonly ISettingRepository _settings;
         private readonly ITenantManager _tenantManager;
         private readonly ISyncManager _syncManager;
-        private readonly IConfigManager _configManager;
         private readonly ILogManager _logger;
         private readonly IMemoryCache _cache;
         private readonly IHttpContextAccessor _accessor;
-        private readonly string _private = "[PRIVATE]";
 
-        public ServerSiteService(ISiteRepository sites, ISiteGroupMemberRepository siteGroupMembers, IAliasRepository aliases, IPageRepository pages, IThemeRepository themes, IPageModuleRepository pageModules, IModuleDefinitionRepository moduleDefinitions, ILanguageRepository languages, IUserManager userManager, IUserPermissions userPermissions, ISettingRepository settings, ITenantManager tenantManager, ISyncManager syncManager, IConfigManager configManager, ILogManager logger, IMemoryCache cache, IHttpContextAccessor accessor)
+        public ServerSiteService(ISiteRepository sites, IPageRepository pages, IThemeRepository themes, IPageModuleRepository pageModules, IModuleDefinitionRepository moduleDefinitions, ILanguageRepository languages, IUserPermissions userPermissions, ISettingRepository settings, ITenantManager tenantManager, ISyncManager syncManager, ILogManager logger, IMemoryCache cache, IHttpContextAccessor accessor)
         {
             _sites = sites;
-            _siteGroupMembers = siteGroupMembers;
-            _aliases = aliases;
             _pages = pages;
             _themes = themes;
             _pageModules = pageModules;
             _moduleDefinitions = moduleDefinitions;
             _languages = languages;
-            _userManager = userManager;
             _userPermissions = userPermissions;
             _settings = settings;
             _tenantManager = tenantManager;
             _syncManager = syncManager;
-            _configManager = configManager;
             _logger = logger;
             _cache = cache;
             _accessor = accessor;
         }
 
-        public Task<List<Site>> GetSitesAsync()
+        public async Task<List<Site>> GetSitesAsync()
         {
             List<Site> sites = new List<Site>();
             if (_accessor.HttpContext.User.IsInRole(RoleNames.Host))
             {
-                sites = _sites.GetSites().ToList();
+                sites = (await _sites.GetSitesAsync()).ToList();
             }
-            return Task.FromResult(sites);
+            return sites;
         }
 
-        public Task<Site> GetSiteAsync(int siteId)
+        public async Task<Site> GetSiteAsync(int siteId)
         {
             var alias = _tenantManager.GetAlias();
-            var site = _cache.GetOrCreate($"site:{alias.SiteKey}", entry =>
+            var site = await _cache.GetOrCreateAsync($"site:{alias.SiteKey}", async entry =>
             {
                 entry.SlidingExpiration = TimeSpan.FromMinutes(30);
-                return GetSite(siteId);
+                return await GetSite(siteId);
             });
-
-            // clone object so that cache is not mutated
-            site = site.Clone();
-
-            // trim site settings based on user permissions
-            site.Settings = site.Settings
-                .Where(item => !item.Value.StartsWith(_private) || _accessor.HttpContext.User.IsInRole(RoleNames.Admin))
-                .ToDictionary(setting => setting.Key, setting => setting.Value.Replace(_private, ""));
 
             // trim pages based on user permissions
             var pages = new List<Page>();
@@ -93,45 +75,33 @@ namespace Oqtane.Services
             {
                 if (!page.IsDeleted && _userPermissions.IsAuthorized(_accessor.HttpContext.User, PermissionNames.View, page.PermissionList) && (Utilities.IsEffectiveAndNotExpired(page.EffectiveDate, page.ExpiryDate) || _userPermissions.IsAuthorized(_accessor.HttpContext.User, PermissionNames.Edit, page.PermissionList)))
                 {
-                    page.Settings = page.Settings
-                        .Where(item => !item.Value.StartsWith(_private) || _userPermissions.IsAuthorized(_accessor.HttpContext.User, PermissionNames.Edit, page.PermissionList))
-                        .ToDictionary(setting => setting.Key, setting => setting.Value.Replace(_private, ""));
                     pages.Add(page);
                 }
             }
+
+            // clone object so that cache is not mutated
+            site = site.Clone(site);
             site.Pages = pages;
 
-            // get language display name for user
-            foreach (Language language in site.Languages)
-            {
-                language.Name = CultureInfo.GetCultureInfo(language.Code).DisplayName;
-            }
-            site.Languages = site.Languages.OrderBy(item => item.Name).ToList();
-
-            // get user
-            if (_accessor.HttpContext.User.IsAuthenticated())
-            {
-                site.User = _userManager.GetUser(_accessor.HttpContext.User.UserId(), site.SiteId);
-            }
-
-            return Task.FromResult(site);
+            return site;
         }
 
-        private Site GetSite(int siteid)
+        private async Task<Site> GetSite(int siteid)
         {
             var alias = _tenantManager.GetAlias();
-            var site = _sites.GetSite(siteid);
+            var site = await _sites.GetSiteAsync(siteid);
             if (site != null && site.SiteId == alias.SiteId)
             {
                 // site settings
-                site.Settings = _settings.GetSettings(EntityNames.Site, site.SiteId, EntityNames.Host, -1)
-                    .ToDictionary(setting => setting.SettingName, setting => (setting.IsPrivate ? _private : "") + setting.SettingValue);
+                site.Settings = _settings.GetSettings(EntityNames.Site, site.SiteId)
+                    .Where(item => !item.IsPrivate || _accessor.HttpContext.User.IsInRole(RoleNames.Admin))
+                    .ToDictionary(setting => setting.SettingName, setting => setting.SettingValue);
 
-                // populate file extensions 
+                // populate File Extensions 
                 site.ImageFiles = site.Settings.ContainsKey("ImageFiles") && !string.IsNullOrEmpty(site.Settings["ImageFiles"])
                     ? site.Settings["ImageFiles"] : Constants.ImageFiles;
                 site.UploadableFiles = site.Settings.ContainsKey("UploadableFiles") && !string.IsNullOrEmpty(site.Settings["UploadableFiles"])
-                    ? site.Settings["UploadableFiles"] : Constants.UploadableFiles;
+                ? site.Settings["UploadableFiles"] : Constants.UploadableFiles;
 
                 // pages
                 List<Setting> settings = _settings.GetSettings(EntityNames.Page).ToList();
@@ -139,26 +109,24 @@ namespace Oqtane.Services
                 foreach (Page page in _pages.GetPages(site.SiteId))
                 {
                     page.Settings = settings.Where(item => item.EntityId == page.PageId)
-                        .ToDictionary(setting => setting.SettingName, setting => (setting.IsPrivate ? _private : "") + setting.SettingValue);
+                        .Where(item => !item.IsPrivate || _userPermissions.IsAuthorized(_accessor.HttpContext.User, PermissionNames.Edit, page.PermissionList))
+                        .ToDictionary(setting => setting.SettingName, setting => setting.SettingValue);
                     site.Pages.Add(page);
                 }
+                site.Pages = GetPagesHierarchy(site.Pages);
 
                 // framework modules
-                var modules = GetPageModules(site.SiteId);
+                var modules = await GetModulesAsync(site.SiteId);
                 site.Settings.Add(Constants.AdminDashboardModule, modules.FirstOrDefault(item => item.ModuleDefinitionName == Constants.AdminDashboardModule).ModuleId.ToString());
                 site.Settings.Add(Constants.PageManagementModule, modules.FirstOrDefault(item => item.ModuleDefinitionName == Constants.PageManagementModule).ModuleId.ToString());
 
                 // languages
-                site.Languages = GetLanguages(site.SiteId, alias.TenantId);
+                site.Languages = _languages.GetLanguages(site.SiteId).ToList();
+                var defaultCulture = CultureInfo.GetCultureInfo(Constants.DefaultCulture);
+                site.Languages.Add(new Language { Code = defaultCulture.Name, Name = defaultCulture.DisplayName, Version = Constants.Version, IsDefault = !site.Languages.Any(l => l.IsDefault) });
 
                 // themes
-                site.Themes = _themes.FilterThemes(_themes.GetThemes(site.SiteId).ToList());
-
-                // installation date used for fingerprinting static assets
-                site.Fingerprint = Utilities.GenerateSimpleHash(_configManager.GetSetting("InstallationDate", DateTime.UtcNow.ToString("yyyyMMddHHmm")));
-
-                // set tenant
-                site.TenantId = alias.TenantId;
+                site.Themes = _themes.FilterThemes(_themes.GetThemes().ToList());
             }
             else
             {
@@ -171,11 +139,51 @@ namespace Oqtane.Services
             return site;
         }
 
-        public Task<Site> AddSiteAsync(Site site)
+        private static List<Page> GetPagesHierarchy(List<Page> pages)
+        {
+            List<Page> hierarchy = new List<Page>();
+            Action<List<Page>, Page> getPath = null;
+            getPath = (pageList, page) =>
+            {
+                IEnumerable<Page> children;
+                int level;
+                if (page == null)
+                {
+                    level = -1;
+                    children = pages.Where(item => item.ParentId == null);
+                }
+                else
+                {
+                    level = page.Level;
+                    children = pages.Where(item => item.ParentId == page.PageId);
+                }
+                foreach (Page child in children)
+                {
+                    child.Level = level + 1;
+                    child.HasChildren = pages.Any(item => item.ParentId == child.PageId && !item.IsDeleted && item.IsNavigation);
+                    hierarchy.Add(child);
+                    getPath(pageList, child);
+                }
+            };
+            pages = pages.OrderBy(item => item.Order).ToList();
+            getPath(pages, null);
+
+            // add any non-hierarchical items to the end of the list
+            foreach (Page page in pages)
+            {
+                if (hierarchy.Find(item => item.PageId == page.PageId) == null)
+                {
+                    hierarchy.Add(page);
+                }
+            }
+            return hierarchy;
+        }
+
+        public async Task<Site> AddSiteAsync(Site site)
         {
             if (_accessor.HttpContext.User.IsInRole(RoleNames.Host))
             {
-                site = _sites.AddSite(site);
+                site = await _sites.AddSiteAsync(site);
                 _syncManager.AddSyncEvent(_tenantManager.GetAlias(), EntityNames.Site, site.SiteId, SyncEventActions.Create);
                 _logger.Log(site.SiteId, LogLevel.Information, this, LogFunction.Create, "Site Added {Site}", site);
             }
@@ -183,18 +191,18 @@ namespace Oqtane.Services
             {
                 site = null;
             }
-            return Task.FromResult(site);
+            return site;
         }
 
-        public Task<Site> UpdateSiteAsync(Site site)
+        public async Task<Site> UpdateSiteAsync(Site site)
         {
             if (_accessor.HttpContext.User.IsInRole(RoleNames.Admin))
             {
                 var alias = _tenantManager.GetAlias();
-                var current = _sites.GetSite(site.SiteId, false);
-                if (site.SiteId == alias.SiteId && current != null)
+                var current = await _sites.GetSiteAsync(site.SiteId, false);
+                if (site.SiteId == alias.SiteId && site.TenantId == alias.TenantId && current != null)
                 {
-                    site = _sites.UpdateSite(site);
+                    site = await _sites.UpdateSiteAsync(site);
                     _syncManager.AddSyncEvent(alias, EntityNames.Site, site.SiteId, SyncEventActions.Update);
                     string action = SyncEventActions.Refresh;
                     if (current.RenderMode != site.RenderMode || current.Runtime != site.Runtime)
@@ -214,20 +222,19 @@ namespace Oqtane.Services
             {
                 site = null;
             }
-            return Task.FromResult(site);
+            return site;
         }
 
-        public Task DeleteSiteAsync(int siteId)
+        public async Task DeleteSiteAsync(int siteId)
         {
             if (_accessor.HttpContext.User.IsInRole(RoleNames.Host))
             {
                 var alias = _tenantManager.GetAlias();
-                var site = _sites.GetSite(siteId);
+                var site = await _sites.GetSiteAsync(siteId);
                 if (site != null && site.SiteId == alias.SiteId)
                 {
-                    _sites.DeleteSite(siteId);
+                    await _sites.DeleteSiteAsync(siteId);
                     _syncManager.AddSyncEvent(alias, EntityNames.Site, site.SiteId, SyncEventActions.Delete);
-                    _syncManager.AddSyncEvent(alias, EntityNames.Site, site.SiteId, SyncEventActions.Refresh);
                     _logger.Log(siteId, LogLevel.Information, this, LogFunction.Delete, "Site Deleted {SiteId}", siteId);
                 }
                 else
@@ -235,38 +242,42 @@ namespace Oqtane.Services
                     _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Site Delete Attempt {SiteId}", siteId);
                 }
             }
-            return Task.CompletedTask;
         }
 
-        public Task<List<Module>> GetModulesAsync(int siteId, int pageId)
+        public async Task<List<Module>> GetModulesAsync(int siteId, int pageId)
         {
             var alias = _tenantManager.GetAlias();
-            var modules = _cache.GetOrCreate($"modules:{alias.SiteKey}", entry =>
+            var sitemodules = await _cache.GetOrCreateAsync($"modules:{alias.SiteKey}", async entry =>
             {
                 entry.SlidingExpiration = TimeSpan.FromMinutes(30);
-                return GetPageModules(siteId);
+                return await GetModulesAsync(siteId);
             });
 
-            // clone object so that cache is not mutated
-            modules = modules.ConvertAll(module => module.Clone());
-
-            // trim modules for current page based on user permissions
-            var pagemodules = new List<Module>();
-            foreach (Module module in modules.Where(item => (item.PageId == pageId || pageId == -1) && !item.IsDeleted && _userPermissions.IsAuthorized(_accessor.HttpContext.User, PermissionNames.View, item.PermissionList)))
+            var modules = new List<Module>();
+            foreach (Module module in sitemodules.Where(item => (item.PageId == pageId || pageId == -1) && !item.IsDeleted && _userPermissions.IsAuthorized(_accessor.HttpContext.User, PermissionNames.View, item.PermissionList)))
             {
                 if (Utilities.IsEffectiveAndNotExpired(module.EffectiveDate, module.ExpiryDate) || _userPermissions.IsAuthorized(_accessor.HttpContext.User, PermissionNames.Edit, module.PermissionList))
                 {
-                    module.Settings = module.Settings
-                        .Where(item => !item.Value.StartsWith(_private) || _userPermissions.IsAuthorized(_accessor.HttpContext.User, PermissionNames.Edit, module.PermissionList))
-                        .ToDictionary(setting => setting.Key, setting => setting.Value.Replace(_private, ""));
-                    pagemodules.Add(module);
+                    modules.Add(module);
                 }
             }
-            return Task.FromResult(pagemodules);
+            return modules;
         }
 
-        private List<Module> GetPageModules(int siteId)
+        public async Task<List<Module>> GetModulesAsync(int siteId)
         {
+            var alias = _tenantManager.GetAlias();
+            return await _cache.GetOrCreateAsync($"modules:{alias.SiteKey}", async entry =>
+            {
+                entry.SlidingExpiration = TimeSpan.FromMinutes(30);
+                return await GetModules(siteId);
+            });
+        }
+
+        private async Task<List<Module>> GetModules(int siteId)
+        {
+            await Task.Yield(); // force method to async
+
             List<ModuleDefinition> moduledefinitions = _moduleDefinitions.GetModuleDefinitions(siteId).ToList();
             var settings = _settings.GetSettings(EntityNames.Module).ToList();
             var modules = new List<Module>();
@@ -296,13 +307,12 @@ namespace Oqtane.Services
                     ContainerType = pagemodule.ContainerType,
                     EffectiveDate = pagemodule.EffectiveDate,
                     ExpiryDate = pagemodule.ExpiryDate,
-                    Header = pagemodule.Header,
-                    Footer = pagemodule.Footer,
 
                     ModuleDefinition = _moduleDefinitions.FilterModuleDefinition(moduledefinitions.Find(item => item.ModuleDefinitionName == pagemodule.Module.ModuleDefinitionName)),
 
                     Settings = settings.Where(item => item.EntityId == pagemodule.ModuleId)
-                        .ToDictionary(setting => setting.SettingName, setting => (setting.IsPrivate ? _private : "") + setting.SettingValue)
+                        .Where(item => !item.IsPrivate || _userPermissions.IsAuthorized(_accessor.HttpContext.User, PermissionNames.Edit, pagemodule.Module.PermissionList))
+                        .ToDictionary(setting => setting.SettingName, setting => setting.SettingValue)
                 };
 
                 modules.Add(module);
@@ -310,47 +320,6 @@ namespace Oqtane.Services
 
             return modules.OrderBy(item => item.PageId).ThenBy(item => item.Pane).ThenBy(item => item.Order).ToList();
         }
-
-        private List<Language> GetLanguages(int siteId, int tenantId)
-        {
-            var languages = new List<Language>();
-
-            var siteGroupMembers = _siteGroupMembers.GetSiteGroupMembers();
-            if (siteGroupMembers.Any(item => item.SiteId == siteId && item.SiteGroup.Type == SiteGroupTypes.Localization))
-            {
-                // site is part of a localized site group - get all languages from the site group
-                var sites = _sites.GetSites().ToList();
-                var aliases = _aliases.GetAliases().ToList();
-
-                foreach (var siteGroupId in siteGroupMembers.Where(item => item.SiteId == siteId && item.SiteGroup.Type == SiteGroupTypes.Localization).Select(item => item.SiteGroupId).Distinct().ToList())
-                {
-                    foreach (var siteGroupMember in siteGroupMembers.Where(item => item.SiteGroupId == siteGroupId))
-                    {
-                        var site = sites.FirstOrDefault(item => item.SiteId == siteGroupMember.SiteId);
-                        if (site != null && !string.IsNullOrEmpty(site.CultureCode))
-                        {
-                            var alias = aliases.FirstOrDefault(item => item.SiteId == siteGroupMember.SiteId && item.TenantId == tenantId && item.IsDefault);
-                            if (alias != null)
-                            {
-                                languages.Add(new Language { Code = site.CultureCode, Name = "", AliasName = alias.Name, IsDefault = false });
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                // use site languages
-                languages = _languages.GetLanguages(siteId).ToList();
-                var defaultCulture = CultureInfo.GetCultureInfo(Constants.DefaultCulture);
-                if (!languages.Exists(item => item.Code == defaultCulture.Name))
-                {
-                    languages.Add(new Language { Code = defaultCulture.Name, Name = "", Version = Constants.Version, IsDefault = !languages.Any(l => l.IsDefault) });
-                }
-            }
-
-            return languages;
-        } 
 
         [Obsolete("This method is deprecated.", false)]
         public void SetAlias(Alias alias)

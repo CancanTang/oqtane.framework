@@ -5,8 +5,6 @@
 @inject IUserService UserService
 @inject IProfileService ProfileService
 @inject ISettingService SettingService
-@inject ITimeZoneService TimeZoneService
-@inject ILanguageService LanguageService
 @inject IStringLocalizer<Add> Localizer
 @inject IStringLocalizer<SharedResources> SharedLocalizer
 
@@ -14,13 +12,32 @@
 {
     <TabStrip>
         <TabPanel Name="Identity" ResourceKey="Identity">
-            @if (_profiles != null)
+            @if (profiles != null)
             {
+                <ModuleMessage Message="@_passwordrequirements" Type="MessageType.Info" />
                 <div class="container">
                     <div class="row mb-1 align-items-center">
                         <Label Class="col-sm-3" For="username" HelpText="A unique username for a user. Note that this field can not be modified once it is saved." ResourceKey="Username"></Label>
                         <div class="col-sm-9">
                             <input id="username" class="form-control" @bind="@_username" />
+                        </div>
+                    </div>
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="password" HelpText="The user's password. Please choose a password which is sufficiently secure." ResourceKey="Password"></Label>
+                        <div class="col-sm-9">
+                            <div class="input-group">
+                                <input id="password" type="@_passwordtype" class="form-control" @bind="@_password" autocomplete="new-password" required />
+                                <button type="button" class="btn btn-secondary" @onclick="@TogglePassword" tabindex="-1">@_togglepassword</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="confirm" HelpText="Please enter the password again to confirm it matches with the value above" ResourceKey="Confirm"></Label>
+                        <div class="col-sm-9">
+                            <div class="input-group">
+                                <input id="confirm" type="@_passwordtype" class="form-control" @bind="@_confirm" autocomplete="new-password" required />
+                                <button type="button" class="btn btn-secondary" @onclick="@TogglePassword" tabindex="-1">@_togglepassword</button>
+                            </div>
                         </div>
                     </div>
                     <div class="row mb-1 align-items-center">
@@ -30,42 +47,9 @@
                         </div>
                     </div>
                     <div class="row mb-1 align-items-center">
-                        <Label Class="col-sm-3" For="confirmed" HelpText="Indicates if the user's email is verified" ResourceKey="Confirmed">Verified?</Label>
-                        <div class="col-sm-9">
-                            <select id="confirmed" class="form-select" @bind="@_confirmed">
-                                <option value="True">@SharedLocalizer["Yes"]</option>
-                                <option value="False">@SharedLocalizer["No"]</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="row mb-1 align-items-center">
                         <Label Class="col-sm-3" For="displayname" HelpText="The full name of the user" ResourceKey="DisplayName"></Label>
                         <div class="col-sm-9">
                             <input id="displayname" class="form-control" @bind="@_displayname" />
-                        </div>
-                    </div>
-                    <div class="row mb-1 align-items-center">
-                        <Label Class="col-sm-3" For="timezone" HelpText="Your time zone" ResourceKey="TimeZone">Time Zone:</Label>
-                        <div class="col-sm-9">
-                            <select id="timezone" class="form-select" @bind="@_timezoneid">
-                                <option value="">&lt;@SharedLocalizer["Not Specified"]&gt;</option>
-                                @foreach (var timezone in _timezones)
-                                {
-                                    <option value="@timezone.Id">@timezone.DisplayName</option>
-                                }
-                            </select>
-                        </div>
-                    </div>
-                    <div class="row mb-1 align-items-center">
-                        <Label Class="col-sm-3" For="culture" HelpText="The user's preferred language. Note that you will only be able to choose from languages supported on this site." ResourceKey="CultureCode">Language:</Label>
-                        <div class="col-sm-9">
-                            <select id="culture" class="form-select" @bind="@_culturecode">
-                                <option value="">&lt;@SharedLocalizer["Not Specified"]&gt;</option>
-                                @foreach (var language in _languages)
-                                {
-                                    <option value="@language.Code">@language.Name</option>
-                                }
-                            </select>
                         </div>
                     </div>
                     <div class="row mb-1 align-items-center">
@@ -83,34 +67,31 @@
         <TabPanel Name="Profile" ResourceKey="Profile">
             <div class="container">
                 <div class="row mb-1 align-items-center">
-                    @foreach (Profile profile in _profiles)
+                    @foreach (Profile profile in profiles)
                     {
                         var p = profile;
-                        if (p.Category != _category)
+                        if (p.Category != category)
                         {
                             <div class="col text-center pb-2">
                                 <strong>@p.Category</strong>
                             </div>
-                            _category = p.Category;
+                            category = p.Category;
                         }
                         <div class="row mb-1 align-items-center">
                             <Label Class="col-sm-3" For="@p.Name" HelpText="@p.Description">@p.Title</Label>
-                            <div class="col-sm-9">
-                                @if (!string.IsNullOrEmpty(p.Options))
+                                <div class="col-sm-9">
+                                    @if (!string.IsNullOrEmpty(p.Options))
                                 {
                                     <select id="@p.Name" class="form-select" @onchange="@(e => ProfileChanged(e, p.Name))">
                                         @foreach (var option in p.Options.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
                                         {
-                                            var values = option.Split(':');
-                                            var name = values[0];
-                                            var value = values.Length > 1 ? values[1] : values[0];
-                                            @if (GetProfileValue(p.Name, "") == name || (GetProfileValue(p.Name, "") == "" && p.DefaultValue == name))
+                                            @if (GetProfileValue(p.Name, "") == option || (GetProfileValue(p.Name, "") == "" && p.DefaultValue == option))
                                             {
-                                                <option value="@name" selected>@value</option>
+                                                <option value="@option" selected>@option</option>
                                             }
                                             else
                                             {
-                                                <option value="@name">@value</option>
+                                                <option value="@option">@option</option>
                                             }
                                         }
                                     </select>
@@ -119,11 +100,11 @@
                                 {
                                     @if (p.Rows == 1)
                                     {
-                                        <input id="@p.Name" class="form-control" value="@GetProfileValue(p.Name, p.DefaultValue)" @onchange="@(e => ProfileChanged(e, p.Name))" @attributes="@(p.MaxLength > 0 ? new Dictionary<string, object> {{"maxlength", p.MaxLength }} : null)" />
+                                        <input id="@p.Name" class="form-control" maxlength="@p.MaxLength" value="@GetProfileValue(p.Name, p.DefaultValue)" @onchange="@(e => ProfileChanged(e, p.Name))" />
                                     }
                                     else
                                     {
-                                        <textarea id="@p.Name" class="form-control" rows="@p.Rows" value="@GetProfileValue(p.Name, p.DefaultValue)" @onchange="@(e => ProfileChanged(e, p.Name))" @attributes="@(p.MaxLength > 0 ? new Dictionary<string, object> {{"maxlength", p.MaxLength }} : null)"></textarea>
+                                        <textarea id="@p.Name" class="form-control" maxlength="@p.MaxLength" rows="@p.Rows" value="@GetProfileValue(p.Name, p.DefaultValue)" @onchange="@(e => ProfileChanged(e, p.Name))"></textarea>
                                     }
                                 }
                             </div>
@@ -141,20 +122,19 @@
 
 
 @code {
-    private List<Models.TimeZone> _timezones;
-    private IEnumerable<Models.Language> _languages;
-
     private bool _initialized = false;
+    private string _passwordrequirements;
     private string _username = string.Empty;
+    private string _password = string.Empty;
+    private string _passwordtype = "password";
+    private string _togglepassword = string.Empty;
+    private string _confirm = string.Empty;
     private string _email = string.Empty;
-    private string _confirmed = "True";
     private string _displayname = string.Empty;
-    private string _timezoneid = string.Empty;
-    private string _culturecode = string.Empty;
     private string _notify = "True";
-    private List<Profile> _profiles;
-    private Dictionary<string, string> _settings;
-    private string _category = string.Empty;
+    private List<Profile> profiles;
+    private Dictionary<string, string> settings;
+    private string category = string.Empty;
 
     public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Edit;
 
@@ -162,25 +142,10 @@
     {
         try
         {
-            _timezones = TimeZoneService.GetTimeZones();
-            _languages = await LanguageService.GetLanguagesAsync(PageState.Site.SiteId);
-
-            _timezoneid = PageState.Site.TimeZoneId;
-            _culturecode = PageState.Site.CultureCode;
-
-            _profiles = await ProfileService.GetProfilesAsync(ModuleState.SiteId);
-            foreach (var profile in _profiles)
-            {
-                if (profile.Options.ToLower().StartsWith("entityname:"))
-                {
-                    var options = await SettingService.GetSettingsAsync(profile.Options.Substring(11), -1);
-                    options.Add("", $"<{SharedLocalizer["Not Specified"]}>");
-                    profile.Options = string.Join(",", options.OrderBy(item => item.Value).Select(kvp => $"{kvp.Key}:{kvp.Value}"));
-                }
-            }
-
-            _settings = new Dictionary<string, string>();
-
+            _passwordrequirements = await UserService.GetPasswordRequirementsAsync(PageState.Site.SiteId);
+            _togglepassword = SharedLocalizer["ShowPassword"];
+            profiles = await ProfileService.GetProfilesAsync(ModuleState.SiteId);
+            settings = new Dictionary<string, string>();
             _initialized = true;
         }
         catch (Exception ex)
@@ -192,7 +157,7 @@
 
     private string GetProfileValue(string SettingName, string DefaultValue)
     {
-        string value = SettingService.GetSetting(_settings, SettingName, DefaultValue);
+        string value = SettingService.GetSetting(settings, SettingName, DefaultValue);
         if (value.Contains("]"))
         {
             value = value.Substring(value.IndexOf("]") + 1);
@@ -204,35 +169,39 @@
     {
         try
         {
-            if (_username != string.Empty && _email != string.Empty)
+            if (_username != string.Empty && _password != string.Empty && _confirm != string.Empty && _email != string.Empty)
             {
-                if (ValidateProfiles())
+                if (_password == _confirm)
                 {
-                    var user = new User();
-                    user.SiteId = PageState.Site.SiteId;
-                    user.Username = _username;
-                    user.Password = ""; // will be auto generated
-                    user.Email = _email;
-                    user.EmailConfirmed = bool.Parse(_confirmed);
-                    user.DisplayName = string.IsNullOrWhiteSpace(_displayname) ? _username : _displayname;
-                    user.TimeZoneId = _timezoneid;
-                    user.CultureCode = _culturecode;
-                    user.PhotoFileId = null;
-                    user.SuppressNotification = !bool.Parse(_notify);
-
-                    user = await UserService.AddUserAsync(user);
-
-                    if (user != null)
+                    if (ValidateProfiles())
                     {
-                        await SettingService.UpdateUserSettingsAsync(_settings, user.UserId);
-                        await logger.LogInformation("User Created {User}", user);
-                        NavigationManager.NavigateTo(NavigateUrl());
+                        var user = new User();
+                        user.SiteId = PageState.Site.SiteId;
+                        user.Username = _username;
+                        user.Password = _password;
+                        user.Email = _email;
+                        user.DisplayName = string.IsNullOrWhiteSpace(_displayname) ? _username : _displayname;
+                        user.PhotoFileId = null;
+                        user.SuppressNotification = !bool.Parse(_notify);
+
+                        user = await UserService.AddUserAsync(user);
+
+                        if (user != null)
+                        {
+                            await SettingService.UpdateUserSettingsAsync(settings, user.UserId);
+                            await logger.LogInformation("User Created {User}", user);
+                            NavigationManager.NavigateTo(NavigateUrl());
+                        }
+                        else
+                        {
+                            await logger.LogError("Error Adding User {Username} {Email}", _username, _email);
+                            AddModuleMessage(Localizer["Error.User.AddCheckPass"], MessageType.Error);
+                        }
                     }
-                    else
-                    {
-                        await logger.LogError("Error Adding User {Username} {Email}", _username, _email);
-                        AddModuleMessage(Localizer["Error.User.AddCheckPass"], MessageType.Error);
-                    }
+                }
+                else
+                {
+                    AddModuleMessage(Localizer["Message.Password.NoMatch"], MessageType.Warning);
                 }
             }
             else
@@ -249,12 +218,12 @@
 
     private bool ValidateProfiles()
     {
-        foreach (Profile profile in _profiles)
+        foreach (Profile profile in profiles)
         {
             var value = GetProfileValue(profile.Name, string.Empty);
             if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(profile.DefaultValue))
             {
-                _settings = SettingService.SetSetting(_settings, profile.Name, profile.DefaultValue);
+                settings = SettingService.SetSetting(settings, profile.Name, profile.DefaultValue);
             }
             if (!profile.IsPrivate || UserSecurity.IsAuthorized(PageState.User, RoleNames.Admin))
             {
@@ -281,6 +250,20 @@
     private void ProfileChanged(ChangeEventArgs e, string SettingName)
     {
         var value = (string)e.Value;
-        _settings = SettingService.SetSetting(_settings, SettingName, value);
+        settings = SettingService.SetSetting(settings, SettingName, value);
     }
+
+    private void TogglePassword()
+	{
+		if (_passwordtype == "password")
+		{
+			_passwordtype = "text";
+			_togglepassword = SharedLocalizer["HidePassword"];
+		}
+		else
+		{
+			_passwordtype = "password";
+			_togglepassword = SharedLocalizer["ShowPassword"];
+		}
+	}
 }

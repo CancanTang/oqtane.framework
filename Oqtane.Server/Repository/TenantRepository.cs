@@ -8,14 +8,6 @@ using Oqtane.Shared;
 
 namespace Oqtane.Repository
 {
-    public interface ITenantRepository
-    {
-        IEnumerable<Tenant> GetTenants();
-        Tenant AddTenant(Tenant tenant);
-        Tenant UpdateTenant(Tenant tenant);
-        Tenant GetTenant(int tenantId);
-        void DeleteTenant(int tenantId);
-    }
     public class TenantRepository : ITenantRepository
     {
         private MasterDBContext _db;

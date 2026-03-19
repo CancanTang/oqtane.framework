@@ -18,7 +18,7 @@ namespace Oqtane.Migrations.Tenant
         {
             var profileEntityBuilder = new ProfileEntityBuilder(migrationBuilder, ActiveDatabase);
             profileEntityBuilder.AddIntegerColumn("Rows", true);
-            profileEntityBuilder.UpdateData("Rows", 1);
+            profileEntityBuilder.UpdateColumn("Rows", "1");
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)

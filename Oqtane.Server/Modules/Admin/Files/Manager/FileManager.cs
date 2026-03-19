@@ -34,6 +34,7 @@ namespace Oqtane.Modules.Admin.Files.Manager
                 if (folder.ModifiedOn >= lastIndexedOn)
                 {
                     changed = true;
+                    removed = folder.IsDeleted.Value;
                 }
 
                 var files = _fileRepository.GetFiles(folder.FolderId);
@@ -44,25 +45,10 @@ namespace Oqtane.Modules.Admin.Files.Manager
                         var path = folder.Path + file.Name;
 
                         var body = "";
-                        if (System.IO.File.Exists(_fileRepository.GetFilePath(file)))
+                        if (DocumentExtensions.Contains(Path.GetExtension(file.Name)))
                         {
-                            // only non-binary files can be indexed
-                            if (DocumentExtensions.Contains(Path.GetExtension(file.Name)))
-                            {
-                                // get the contents of the file
-                                try
-                                {
-                                    body = System.IO.File.ReadAllText(_fileRepository.GetFilePath(file));
-                                }
-                                catch
-                                {
-                                    // could not read the file
-                                }
-                            }
-                        }
-                        else
-                        {
-                            removed = true; // file does not exist on disk
+                            // get the contents of the file
+                            body = System.IO.File.ReadAllText(_fileRepository.GetFilePath(file));
                         }
 
                         var searchContent = new SearchContent
@@ -77,7 +63,7 @@ namespace Oqtane.Modules.Admin.Files.Manager
                             Permissions = $"{EntityNames.Folder}:{folder.FolderId}",
                             ContentModifiedBy = file.ModifiedBy,
                             ContentModifiedOn = file.ModifiedOn,
-                            IsDeleted = (removed)
+                            IsDeleted = (removed || file.IsDeleted.Value)
                         };
                         searchContents.Add(searchContent);
                     }

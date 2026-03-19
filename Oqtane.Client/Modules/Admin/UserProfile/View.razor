@@ -128,7 +128,7 @@
                 createdon = notification.CreatedOn.ToString();
                 body = notification.Body;
 
-                if (title == "From" && !notification.IsRead)
+                if (title == "From")
                 {
                     notification.IsRead = true;
                     notification = await NotificationService.UpdateNotificationAsync(notification);

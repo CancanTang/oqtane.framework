@@ -19,7 +19,7 @@ namespace Oqtane.Migrations.Tenant
             var pageEntityBuilder = new PageEntityBuilder(migrationBuilder, ActiveDatabase);
 
             pageEntityBuilder.AddBooleanColumn("IsClickable", true);
-            pageEntityBuilder.UpdateData("IsClickable", true);
+            pageEntityBuilder.UpdateColumn("IsClickable", "1", "bool", "");
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)

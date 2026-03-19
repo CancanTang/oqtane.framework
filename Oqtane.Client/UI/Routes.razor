@@ -1,5 +1,7 @@
 @namespace Oqtane.UI
+@using Microsoft.AspNetCore.Http
 @inject IInstallationService InstallationService
+@inject IJSRuntime JSRuntime
 @inject SiteState SiteState
 
 @if (_initialized)
@@ -46,9 +48,12 @@
     [Parameter]
     public string Platform { get; set; } = "";
 
+    [CascadingParameter]
+    HttpContext HttpContext { get; set; }
+
     private bool _initialized = false;
     private bool _installed = false;
-    private string _display = "display: none;"; // prevents flash on initial interactive page load
+    private string _display = "display: none;";
 
     private PageState _pageState { get; set; }
 
@@ -56,12 +61,13 @@
     {
         SiteState.AntiForgeryToken = AntiForgeryToken;
         SiteState.AuthorizationToken = AuthorizationToken;
+        SiteState.RemoteIPAddress = (_pageState != null) ? _pageState.RemoteIPAddress : "";
         SiteState.Platform = Platform;
-        SiteState.IsPrerendering = !RendererInfo.IsInteractive;
+        SiteState.IsPrerendering = (HttpContext != null) ? true : false;
 
         if (Runtime == Runtimes.Hybrid)
         {
-            var installation = await InstallationService.IsInstalled();
+             var installation = await InstallationService.IsInstalled();
             _installed = installation.Success;
             if (installation.Alias != null)
             {
@@ -73,8 +79,7 @@
             if (PageState != null)
             {
                 _pageState = PageState;
-                SiteState.Alias = _pageState.Alias;
-                SiteState.RemoteIPAddress = _pageState.RemoteIPAddress;
+                SiteState.Alias = PageState.Alias;
                 _installed = true;
             }
         }
@@ -85,6 +90,7 @@
     {
         if (firstRender)
         {
+            // prevents flash on initial interactive page load
             _display = "";
             StateHasChanged();
         }

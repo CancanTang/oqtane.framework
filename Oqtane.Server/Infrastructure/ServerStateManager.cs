@@ -4,11 +4,6 @@ using System.Linq;
 namespace Oqtane.Infrastructure
 {
     // singleton
-    public interface IServerStateManager
-    {
-        ServerState GetServerState(string siteKey);
-    }
-
     public class ServerStateManager : IServerStateManager
     {
         private List<ServerState> _serverStates { get; set; }

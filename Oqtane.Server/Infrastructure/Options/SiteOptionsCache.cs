@@ -19,6 +19,7 @@ namespace Oqtane.Infrastructure
         {
             var cache = map.GetOrAdd(GetKey(), new OptionsCache<TOptions>());
             cache.Clear();
+
         }
 
         public TOptions GetOrAdd(string name, Func<TOptions> createOptions)

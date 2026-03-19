@@ -15,10 +15,10 @@ namespace Oqtane.Modules.HtmlText
             Version = "1.0.1",
             ServerManagerType = "Oqtane.Modules.HtmlText.Manager.HtmlTextManager, Oqtane.Server",
             ReleaseVersions = "1.0.0,1.0.1",
-            SettingsType = "Oqtane.Modules.HtmlText.Settings, Oqtane.Client",
+            SettingsType = string.Empty,
             Resources = new List<Resource>()
             {
-                new Stylesheet("~/Module.css")
+                new Resource { ResourceType = ResourceType.Stylesheet, Url = "~/Module.css" }
             }
         };
     }

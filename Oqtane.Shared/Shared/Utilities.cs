@@ -1,21 +1,13 @@
+using Oqtane.Models;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-
-using NodaTime;
-using NodaTime.Extensions;
-
-using Oqtane.Models;
-
 using File = Oqtane.Models.File;
-using TimeZone = Oqtane.Models.TimeZone;
 
 namespace Oqtane.Shared
 {
@@ -31,13 +23,12 @@ namespace Oqtane.Shared
 
         public static (string UrlParameters, string Querystring, string Fragment) ParseParameters(string parameters)
         {
-            // /urlparameters /urlparameters?id=1 /urlparameters#5 /urlparameters?id=1#5 /urlparameters?reload#5
-            // ?id=1 ?id=1#5 ?reload#5 ?reload
-            // id=1 id=1#5 reload#5 reload
+            // /urlparameters /urlparameters?Id=1 /urlparameters#5 /urlparameters?Id=1#5 /urlparameters?reload#5
+            // Id=1 Id=1#5 reload#5 reload
             // #5
 
             // create absolute url to convert to Uri
-            parameters = (!parameters.StartsWith("/") && !parameters.StartsWith("#") && !parameters.StartsWith("?") ? "?" : "") + parameters;
+            parameters = (!parameters.StartsWith("/") && !parameters.StartsWith("#") ? "?" : "") + parameters;
             parameters = Constants.PackageRegistryUrl + parameters;
             var uri = new Uri(parameters);
             var querystring = uri.Query.Replace("?", "");
@@ -127,17 +118,6 @@ namespace Oqtane.Shared
             position = string.IsNullOrEmpty(position) ? "center" : position;
             background = string.IsNullOrEmpty(background) ? "transparent" : background;
             return $"{alias?.BaseUrl}{url}{Constants.ImageUrl}{fileId}/{width}/{height}/{mode}/{position}/{background}/{rotate}/{recreate}";
-        }
-
-        public static string ImageUrl(Alias alias, string folderpath, string filename, int width, int height, string mode, string position, string background, int rotate, string format, bool recreate)
-        {
-            var aliasUrl = (alias != null && !string.IsNullOrEmpty(alias.Path)) ? "/" + alias.Path : "";
-            mode = string.IsNullOrEmpty(mode) ? "crop" : mode;
-            position = string.IsNullOrEmpty(position) ? "center" : position;
-            background = string.IsNullOrEmpty(background) ? "transparent" : background;
-            format = string.IsNullOrEmpty(format) ? "png" : format;
-            var querystring = $"?width={width}&height={height}&mode={mode}&position={position}&background={background}&rotate={rotate}&format={format}&recreate={recreate}";
-            return $"{alias?.BaseUrl}{aliasUrl}{Constants.FileUrl}{folderpath.Replace("\\", "/")}{filename}{querystring}";
         }
 
         public static string TenantUrl(Alias alias, string url)
@@ -499,21 +479,11 @@ namespace Oqtane.Shared
             return querystring;
         }
 
-        public static string GetUrlPath(string url)
-        {
-            if (!string.IsNullOrEmpty(url) && url.Contains("?"))
-            {
-                url = url.Substring(0, url.IndexOf("?"));
-            }
-            return url ?? "";
-        }
-
         public static string LogMessage(object @class, string message)
         {
             return $"[{@class.GetType()}] {message}";
         }
 
-        //Time conversions with TimeZoneInfo
         public static DateTime? LocalDateAndTimeAsUtc(DateTime? date, string time, TimeZoneInfo localTimeZone = null)
         {
             if (date != null && !string.IsNullOrEmpty(time) && TimeSpan.TryParse(time, out TimeSpan timespan))
@@ -590,110 +560,6 @@ namespace Oqtane.Shared
 
             return (localDateTime?.Date, localTime);
         }
-
-        //Time conversions with NodaTime (IANA) timezoneId
-        public static DateTime? LocalDateAndTimeAsUtc(DateTime? date, string time, string localTimeZoneId)
-        {
-            if (date != null && !string.IsNullOrEmpty(time) && TimeSpan.TryParse(time, out TimeSpan timespan))
-            {
-                return LocalDateAndTimeAsUtc(date.Value.Date.Add(timespan), localTimeZoneId);
-            }
-            return null;
-        }
-
-        public static DateTime? LocalDateAndTimeAsUtc(DateTime? date, DateTime? time, string localTimeZoneId)
-        {
-            if (date != null)
-            {
-                if (time != null)
-                {
-                    return LocalDateAndTimeAsUtc(date.Value.Date.Add(time.Value.TimeOfDay), localTimeZoneId);
-                }
-                return LocalDateAndTimeAsUtc(date.Value.Date, localTimeZoneId);
-            }
-            return null;
-        }
-
-        public static DateTime? LocalDateAndTimeAsUtc(DateTime? date, string localTimeZoneId)
-        {
-            if (date != null)
-            {
-                DateTimeZone localTimeZone;
-
-                if (!string.IsNullOrEmpty(localTimeZoneId))
-                {
-                    localTimeZone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(localTimeZoneId) ?? DateTimeZoneProviders.Tzdb.GetSystemDefault();
-                }
-                else
-                {
-                    localTimeZone = DateTimeZoneProviders.Tzdb.GetSystemDefault();
-                }
-
-                var localDateTime = LocalDateTime.FromDateTime(date.Value);
-                return localTimeZone.AtLeniently(localDateTime).ToDateTimeUtc();
-            }
-            return null;
-        }
-
-        public static DateTime? UtcAsLocalDate(DateTime? dateTime, string timeZoneId)
-        {
-            return UtcAsLocalDateAndTime(dateTime, timeZoneId).date;
-        }
-
-        public static DateTime? UtcAsLocalDateTime(DateTime? dateTime, string timeZoneId)
-        {
-            var result = UtcAsLocalDateAndTime(dateTime, timeZoneId);
-            if (result.date != null && !string.IsNullOrEmpty(result.time) && TimeSpan.TryParse(result.time, out TimeSpan timespan))
-            {
-                result.date = result.date.Value.Add(timespan);
-            }
-            return result.date;
-        }
-
-        public static (DateTime? date, string time) UtcAsLocalDateAndTime(DateTime? dateTime, string timeZoneId)
-        {
-            DateTimeZone localTimeZone;
-
-            if (!string.IsNullOrEmpty(timeZoneId))
-            {
-                localTimeZone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(timeZoneId) ?? DateTimeZoneProviders.Tzdb.GetSystemDefault();
-            }
-            else
-            {
-                localTimeZone = DateTimeZoneProviders.Tzdb.GetSystemDefault();
-            }
-
-            DateTime? localDateTime = null;
-            string localTime = string.Empty;
-
-            if (dateTime.HasValue && dateTime?.Kind != DateTimeKind.Local)
-            {
-                Instant instant;
-
-                if (dateTime?.Kind == DateTimeKind.Unspecified)
-                {
-                    // Treat Unspecified as Utc not Local. This is due to EF Core, on some databases, after retrieval will have DateTimeKind as Unspecified.
-                    // All values in database should be UTC.
-                    // Normal .net conversion treats Unspecified as local.
-                    // https://docs.microsoft.com/en-us/dotnet/api/system.timezoneinfo.converttime?view=net-6.0
-                    instant = Instant.FromDateTimeUtc(new DateTime(dateTime.Value.Ticks, DateTimeKind.Utc));
-                }
-                else
-                {
-                    instant = Instant.FromDateTimeUtc(dateTime.Value);
-                }
-
-                localDateTime = instant.InZone(localTimeZone).ToDateTimeOffset().DateTime;
-            }
-
-            if (localDateTime != null && localDateTime.Value.TimeOfDay.TotalSeconds != 0)
-            {
-                localTime = localDateTime.Value.ToString("HH:mm");
-            }
-
-            return (localDateTime?.Date, localTime);
-        }
-
         public static bool IsEffectiveAndNotExpired(DateTime? effectiveDate, DateTime? expiryDate)
         {
             DateTime currentUtcTime = DateTime.UtcNow;
@@ -708,6 +574,7 @@ namespace Oqtane.Shared
             }
             else if (expiryDate.HasValue)
             {
+                // Include equality check here
                 return currentUtcTime <= expiryDate.Value;
             }
             else
@@ -718,107 +585,30 @@ namespace Oqtane.Shared
 
         public static bool ValidateEffectiveExpiryDates(DateTime? effectiveDate, DateTime? expiryDate)
         {
+            // Treat DateTime.MinValue as null
             effectiveDate ??= DateTime.MinValue;
             expiryDate ??= DateTime.MinValue;
 
+            // Check if both effectiveDate and expiryDate have values
             if (effectiveDate != DateTime.MinValue && expiryDate != DateTime.MinValue)
             {
                 return effectiveDate <= expiryDate;
             }
+            // Check if only effectiveDate has a value
             else if (effectiveDate != DateTime.MinValue)
             {
                 return true;
             }
+            // Check if only expiryDate has a value
             else if (expiryDate != DateTime.MinValue)
             {
                 return true;
             }
+            // If neither effectiveDate nor expiryDate has a value, consider the page/module visible
             else
             {
                 return true;
             }
-        }
-
-        public static string GenerateSimpleHash(string text)
-        {
-            unchecked // prevent overflow exception
-            {
-                int hash = 23;
-                foreach (char c in text)
-                {
-                    hash = hash * 31 + c;
-                }
-                return hash.ToString("X8");
-            }
-        }
-
-        public static IEnumerable<PropertyInfo> GetPropertiesIncludingInherited(Type type, BindingFlags bindingFlags)
-        {
-            var dictionary = new Dictionary<string, object>(StringComparer.Ordinal);
-
-            var currentType = type;
-            while (currentType != null)
-            {
-                var properties = currentType.GetProperties(bindingFlags | BindingFlags.DeclaredOnly);
-                foreach (var property in properties)
-                {
-                    if (!dictionary.TryGetValue(property.Name, out var others))
-                    {
-                        dictionary.Add(property.Name, property);
-                    }
-                    else if (!IsInheritedProperty(property, others))
-                    {
-                        List<PropertyInfo> many;
-                        if (others is PropertyInfo single)
-                        {
-                            many = new List<PropertyInfo> { single };
-                            dictionary[property.Name] = many;
-                        }
-                        else
-                        {
-                            many = (List<PropertyInfo>)others;
-                        }
-                        many.Add(property);
-                    }
-                }
-
-                currentType = currentType.BaseType;
-            }
-
-            foreach (var item in dictionary)
-            {
-                if (item.Value is PropertyInfo property)
-                {
-                    yield return property;
-                    continue;
-                }
-
-                var list = (List<PropertyInfo>)item.Value;
-                var count = list.Count;
-                for (var i = 0; i < count; i++)
-                {
-                    yield return list[i];
-                }
-            }
-        }
-
-        private static bool IsInheritedProperty(PropertyInfo property, object others)
-        {
-            if (others is PropertyInfo single)
-            {
-                return single.GetMethod?.GetBaseDefinition() == property.GetMethod?.GetBaseDefinition();
-            }
-
-            var many = (List<PropertyInfo>)others;
-            foreach (var other in CollectionsMarshal.AsSpan(many))
-            {
-                if (other.GetMethod?.GetBaseDefinition() == property.GetMethod?.GetBaseDefinition())
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         [Obsolete("ContentUrl(Alias alias, int fileId) is deprecated. Use FileUrl(Alias alias, int fileId) instead.", false)]

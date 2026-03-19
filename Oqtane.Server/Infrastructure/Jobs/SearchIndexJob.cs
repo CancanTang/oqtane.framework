@@ -40,7 +40,7 @@ namespace Oqtane.Infrastructure
             var searchService = provider.GetRequiredService<ISearchService>();
 
             var sites = siteRepository.GetSites().ToList();
-            foreach (var site in sites.Where(item => !item.IsDeleted))
+            foreach (var site in sites)
             {
                 log += $"Indexing Site: {site.Name}<br />";
 
@@ -59,15 +59,8 @@ namespace Oqtane.Infrastructure
                 var currentTime = DateTime.UtcNow;
                 var lastIndexedOn = Convert.ToDateTime(siteSettings.GetValue(SearchLastIndexedOnSetting, DateTime.MinValue.ToString()));
 
-                if (lastIndexedOn == DateTime.MinValue)
-                {
-                    // reset index
-                    log += $"*Site Index Reset*<br />";
-                    await searchService.DeleteSearchContentsAsync(site.SiteId);
-                }
-
                 var ignorePages = siteSettings.GetValue(SearchIgnorePagesSetting, "").Split(',');
-                var ignoreEntities = siteSettings.GetValue(SearchIgnoreEntitiesSetting, "File").Split(',');
+                var ignoreEntities = siteSettings.GetValue(SearchIgnoreEntitiesSetting, "").Split(',');
 
                 var pages = pageRepository.GetPages(site.SiteId);
                 var pageModules = pageModuleRepository.GetPageModules(site.SiteId);

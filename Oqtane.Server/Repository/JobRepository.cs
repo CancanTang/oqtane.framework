@@ -7,16 +7,6 @@ using Oqtane.Models;
 
 namespace Oqtane.Repository
 {
-    public interface IJobRepository
-    {
-        IEnumerable<Job> GetJobs();
-        Job AddJob(Job job);
-        Job UpdateJob(Job job);
-        Job GetJob(int jobId);
-        Job GetJob(int jobId, bool tracking);
-        void DeleteJob(int jobId);
-    }
-
     public class JobRepository : IJobRepository
     {
         private MasterDBContext _db;
@@ -32,14 +22,6 @@ namespace Oqtane.Repository
         {
             return _cache.GetOrCreate("jobs", entry =>
             {
-                // remove any jobs which have been uninstalled
-                foreach (var job in _db.Job.ToList())
-                {
-                    if (Type.GetType(job.JobType) == null)
-                    {
-                        DeleteJob(job.JobId);
-                    }
-                }
                 entry.SlidingExpiration = TimeSpan.FromMinutes(30);
                 return _db.Job.ToList();
             });

@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using System.Xml.Linq;
 
 namespace Oqtane.Models
 {
@@ -30,16 +28,6 @@ namespace Oqtane.Models
         /// User E-Mail address.
         /// </summary>
         public string Email { get; set; }
-
-        /// <summary>
-        /// User time zone
-        /// </summary>
-        public string TimeZoneId { get; set; }
-
-        /// <summary>
-        /// The default culture for the user (ie. en-US)
-        /// </summary>
-        public string CultureCode { get; set; }
 
         /// <summary>
         /// Reference to a <see cref="File"/> containing the users photo.
@@ -72,19 +60,14 @@ namespace Oqtane.Models
         public DateTime? TwoFactorExpiry { get; set; }
 
         /// <summary>
-        /// A token indicating if a user's security properties have been modified
-        /// </summary>
-        [NotMapped]
-        public string SecurityStamp { get; set; }
-
-        /// <summary>
         /// Reference to the <see cref="Site"/> this user belongs to.
         /// </summary>
         [NotMapped]
         public int SiteId { get; set; }
 
         /// <summary>
-        /// Semi-colon delimited list of role names for the user
+        /// Role names this user has.
+        /// TODO: todoc - is this comma separated?
         /// </summary>
         [NotMapped]
         public string Roles { get; set; }
@@ -135,35 +118,5 @@ namespace Oqtane.Models
         /// </summary>
         [NotMapped]
         public Dictionary<string, string> Settings { get; set; }
-
-        public User Clone()
-        {
-            return new User
-            {
-                UserId = UserId,
-                Username = Username,
-                DisplayName = DisplayName,
-                Email = Email,
-                TimeZoneId = TimeZoneId,
-                CultureCode = CultureCode,
-                PhotoFileId = PhotoFileId,
-                LastLoginOn = LastLoginOn,
-                LastIPAddress = LastIPAddress,
-                TwoFactorRequired = TwoFactorRequired,
-                TwoFactorCode = TwoFactorCode,
-                TwoFactorExpiry = TwoFactorExpiry,
-                SecurityStamp = SecurityStamp,
-                SiteId = SiteId,
-                Roles = Roles,
-                DeletedBy = DeletedBy,
-                DeletedOn = DeletedOn,
-                IsDeleted = IsDeleted,
-                Password = Password,
-                IsAuthenticated = IsAuthenticated,
-                EmailConfirmed = EmailConfirmed,
-                SuppressNotification = SuppressNotification,
-                Settings = Settings.ToDictionary(setting => setting.Key, setting => setting.Value)
-            };
-        }
     }
 }

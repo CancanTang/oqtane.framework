@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Text.Json.Serialization;
 using Oqtane.Shared;
 
 namespace Oqtane.Models
@@ -57,6 +56,11 @@ namespace Oqtane.Models
         public string Description { get; set; }
 
         /// <summary>
+        /// Deprecated - not used
+        /// </summary>
+        public bool? IsDeleted { get; set; }
+
+        /// <summary>
         /// Object reference to the <see cref="Folder"/> object.
         /// Use this if you need to determine what <see cref="Site"/> the file belongs to. 
         /// TODO: not sure if this is always populated, must verify and document
@@ -68,16 +72,5 @@ namespace Oqtane.Models
         /// </summary>
         [NotMapped]
         public string Url { get; set; }
-
-        #region Deprecated Properties
-
-        [Obsolete("The IsDeleted property is deprecated. Soft delete of files is not supported.", false)]
-        [NotMapped]
-        [JsonIgnore] // exclude from API payload
-        public bool? IsDeleted { get; set; }
-
-        #endregion
-
-
     }
 }

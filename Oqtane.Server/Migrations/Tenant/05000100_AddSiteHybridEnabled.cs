@@ -18,7 +18,7 @@ namespace Oqtane.Migrations.Tenant
         {
             var siteEntityBuilder = new SiteEntityBuilder(migrationBuilder, ActiveDatabase);
             siteEntityBuilder.AddBooleanColumn("HybridEnabled", true);
-            siteEntityBuilder.UpdateData("HybridEnabled", false); // default to false
+            siteEntityBuilder.UpdateColumn("HybridEnabled", "0", "bool", ""); // default to false
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)

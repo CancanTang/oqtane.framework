@@ -35,7 +35,6 @@ namespace Oqtane.Models
                 new Permission(PermissionNames.View, RoleNames.Admin, true),
                 new Permission(PermissionNames.Edit, RoleNames.Admin, true)
             };
-            Settings = new List<Setting>();
             PageTemplateModules = new List<PageTemplateModule>();
 
             // properties used by IModule
@@ -61,7 +60,6 @@ namespace Oqtane.Models
         public bool IsPersonalizable { get; set; }
         public bool IsDeleted { get; set; }
         public List<Permission> PermissionList { get; set; }
-        public List<Setting> Settings { get; set; }
         public List<PageTemplateModule> PageTemplateModules { get; set; }
 
         // properties used by IModule
@@ -95,17 +93,13 @@ namespace Oqtane.Models
             Pane = PaneNames.Default;
             Order = 1;
             ContainerType = "";
-            Header = "";
-            Footer = "";
             IsDeleted = false;
             PermissionList = new List<Permission>()
             {
                 new Permission(PermissionNames.View, RoleNames.Admin, true),
                 new Permission(PermissionNames.Edit, RoleNames.Admin, true)
             };
-            Settings = new List<Setting>();
             Content = "";
-            FromPagePath = "";
         }
 
         public string ModuleDefinitionName { get; set; }
@@ -113,13 +107,9 @@ namespace Oqtane.Models
         public string Pane { get; set; }
         public int Order { get; set; }
         public string ContainerType { get; set; }
-        public string Header { get; set; }
-        public string Footer { get; set; }
         public bool IsDeleted { get; set; }
         public List<Permission> PermissionList { get; set; }
-        public List<Setting> Settings { get; set; }
         public string Content { get; set; }
-        public string FromPagePath { get; set; } // for modules shared across pages
 
         [Obsolete("The ModulePermissions property is deprecated. Use PermissionList instead", false)]
         public string ModulePermissions

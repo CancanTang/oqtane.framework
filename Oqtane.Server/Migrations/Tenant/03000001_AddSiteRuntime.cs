@@ -18,9 +18,9 @@ namespace Oqtane.Migrations.Tenant
         {
             var siteEntityBuilder = new SiteEntityBuilder(migrationBuilder, ActiveDatabase);
             siteEntityBuilder.AddStringColumn("Runtime", 50, true, true);
-            siteEntityBuilder.UpdateData("Runtime", "'Server'");
+            siteEntityBuilder.UpdateColumn("Runtime", "'Server'");
             siteEntityBuilder.AddStringColumn("RenderMode", 50, true, true);
-            siteEntityBuilder.UpdateData("RenderMode", "'ServerPrerendered'");
+            siteEntityBuilder.UpdateColumn("RenderMode", "'ServerPrerendered'");
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)

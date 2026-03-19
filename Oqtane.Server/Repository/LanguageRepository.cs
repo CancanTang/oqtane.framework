@@ -5,15 +5,6 @@ using Oqtane.Models;
 
 namespace Oqtane.Repository
 {
-    public interface ILanguageRepository
-    {
-        IEnumerable<Language> GetLanguages(int siteId);
-        Language AddLanguage(Language language);
-        void UpdateLanguage(Language language);
-        Language GetLanguage(int languageId);
-        void DeleteLanguage(int languageId);
-    }
-
     public class LanguageRepository : ILanguageRepository
     {
         private readonly IDbContextFactory<TenantDBContext> _dbContextFactory;
@@ -40,7 +31,7 @@ namespace Oqtane.Repository
                     .ToList()
                     .ForEach(l => l.IsDefault = false);
             }
-            language.Name = ""; // stored in database but not used (SQLite limitation)
+
             db.Language.Add(language);
             db.SaveChanges();
 
@@ -64,7 +55,6 @@ namespace Oqtane.Repository
                     .ForEach(l => l.IsDefault = false);
             }
 
-            language.Name = ""; // stored in database but not used (SQLite limitation)
             db.SaveChanges();
         }
 

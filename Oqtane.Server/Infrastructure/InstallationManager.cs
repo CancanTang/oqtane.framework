@@ -18,14 +18,6 @@ using Oqtane.Shared;
 
 namespace Oqtane.Infrastructure
 {
-    public interface IInstallationManager
-    {
-        void InstallPackages();
-        bool UninstallPackage(string PackageName);
-        Task UpgradeFramework(bool backup);
-        void RestartApplication();
-    }
-
     public class InstallationManager : IInstallationManager
     {
         private readonly IHostApplicationLifetime _hostApplicationLifetime;
@@ -60,48 +52,35 @@ namespace Oqtane.Infrastructure
                 Directory.CreateDirectory(sourceFolder);
             }
 
+            // read assembly log
+            var assemblyLogPath = Path.Combine(sourceFolder, "assemblies.log");
+            var assemblies = GetAssemblyLog(assemblyLogPath);
+
             // install Nuget packages in secure Packages folder
             var packages = Directory.GetFiles(sourceFolder, "*.nupkg");
             foreach (string packagename in packages)
             {
                 try
                 {
-                    // open nupkg as zip archive
+                    // iterate through files
                     using (ZipArchive archive = ZipFile.OpenRead(packagename))
                     {
-                        string id = "";
                         string frameworkversion = "";
-
                         // locate nuspec
                         foreach (ZipArchiveEntry entry in archive.Entries)
                         {
                             if (entry.FullName.ToLower().EndsWith(".nuspec"))
                             {
                                 // open nuspec
-                                var reader = new XmlTextReader(entry.Open());
+                                XmlTextReader reader = new XmlTextReader(entry.Open());
                                 reader.Namespaces = false; // remove namespace
-                                var doc = new XmlDocument();
+                                XmlDocument doc = new XmlDocument();
                                 doc.Load(reader);
-                                // get id
-                                var node = doc.SelectSingleNode("/package/metadata/id");
-                                if (node != null)
-                                {
-                                    id = node.InnerText;
-                                }
-                                // get minimum framework version using packageType
-                                node = doc.SelectSingleNode("/package/metadata/packageTypes/packageType[@name='Oqtane.Framework']");
+                                // get framework dependency
+                                XmlNode node = doc.SelectSingleNode("/package/metadata/dependencies/dependency[@id='Oqtane.Framework']");
                                 if (node != null)
                                 {
                                     frameworkversion = node.Attributes["version"].Value;
-                                }
-                                if (string.IsNullOrEmpty(frameworkversion))
-                                {
-                                    // legacy packages used the dependency metadata
-                                    node = doc.SelectSingleNode("/package/metadata/dependencies/dependency[@id='Oqtane.Framework']");
-                                    if (node != null)
-                                    {
-                                        frameworkversion = node.Attributes["version"].Value;
-                                    }
                                 }
                                 reader.Close();
                                 break;
@@ -121,16 +100,13 @@ namespace Oqtane.Infrastructure
                                 string filename = "";
 
                                 // evaluate entry root folder
-                                switch (entry.FullName.Split('/')[0].ToLower())
+                                switch (entry.FullName.Split('/')[0])
                                 {
                                     case "lib": // lib/net*/...
                                         filename = ExtractFile(entry, binPath, 2);
                                         break;
                                     case "wwwroot": // wwwroot/...
                                         filename = ExtractFile(entry, webRootPath, 1);
-                                        break;
-                                    case "staticwebassets": // staticwebassets/...
-                                        filename = ExtractFile(entry, Path.Combine(webRootPath, Path.Combine("_content", id)), 1);
                                         break;
                                     case "runtimes": // runtimes/name/...
                                         filename = ExtractFile(entry, binPath, 0);
@@ -156,6 +132,27 @@ namespace Oqtane.Infrastructure
                                     if (!manifest && filename.EndsWith(name + ".log"))
                                     {
                                         manifest = true;
+                                    }
+
+                                    // register assembly
+                                    if (Path.GetExtension(filename) == ".dll")
+                                    {
+                                        // do not register licensing assemblies
+                                        if (!Path.GetFileName(filename).StartsWith("Oqtane.Licensing."))
+                                        {
+                                            // if package version was not installed previously
+                                            if (!File.Exists(Path.Combine(sourceFolder, name + ".log")))
+                                            {
+                                                if (assemblies.ContainsKey(Path.GetFileName(filename)))
+                                                {
+                                                    assemblies[Path.GetFileName(filename)] += 1;
+                                                }
+                                                else
+                                                {
+                                                    assemblies.Add(Path.GetFileName(filename), 1);
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -184,6 +181,12 @@ namespace Oqtane.Infrastructure
 
                 // remove package
                 File.Delete(packagename);
+            }
+
+            if (packages.Length != 0)
+            {
+                // save assembly log
+                SetAssemblyLog(assemblyLogPath, assemblies);
             }
 
             return errors;
@@ -238,6 +241,10 @@ namespace Oqtane.Infrastructure
         {
             if (!string.IsNullOrEmpty(PackageName))
             {
+                // read assembly log
+                var assemblyLogPath = Path.Combine(Path.Combine(_environment.ContentRootPath, Constants.PackagesFolder), "assemblies.log");
+                var assemblies = GetAssemblyLog(assemblyLogPath);
+
                 // get manifest with highest version
                 string packagename = "";
                 string[] packages = Directory.GetFiles(Path.Combine(_environment.ContentRootPath, Constants.PackagesFolder), PackageName + "*.log");
@@ -262,7 +269,23 @@ namespace Oqtane.Infrastructure
                             // do not remove licensing assemblies
                             if (!Path.GetFileName(filepath).StartsWith("Oqtane.Licensing."))
                             {
-                                DeleteFile(filepath);
+                                // use assembly log to determine if assembly is used in other packages
+                                if (assemblies.ContainsKey(Path.GetFileName(filepath)))
+                                {
+                                    if (assemblies[Path.GetFileName(filepath)] == 1)
+                                    {
+                                        DeleteFile(filepath);
+                                        assemblies.Remove(Path.GetFileName(filepath));
+                                    }
+                                    else
+                                    {
+                                        assemblies[Path.GetFileName(filepath)] -= 1;
+                                    }
+                                }
+                                else // does not exist in assembly log
+                                {
+                                    DeleteFile(filepath);
+                                }
                             }
                         }
                         else // not an assembly
@@ -276,6 +299,9 @@ namespace Oqtane.Infrastructure
                     {
                         File.Delete(asset);
                     }
+
+                    // save assembly log
+                    SetAssemblyLog(assemblyLogPath, assemblies);
 
                     return true;
                 }
@@ -296,7 +322,65 @@ namespace Oqtane.Infrastructure
             }
         }
 
-        public async Task UpgradeFramework(bool backup)
+        public int RegisterAssemblies()
+        {
+            var assemblyLogPath = GetAssemblyLogPath();
+            var binFolder = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+
+            var assemblies = GetAssemblyLog(assemblyLogPath);
+
+            // remove assemblies that no longer exist
+            foreach (var dll in assemblies)
+            {
+                if (!File.Exists(Path.Combine(binFolder, dll.Key)))
+                {
+                    assemblies.Remove(dll.Key);
+                }
+            }
+            // add assemblies which are not registered
+            foreach (var dll in Directory.GetFiles(binFolder, "*.dll"))
+            {
+                if (!assemblies.ContainsKey(Path.GetFileName(dll)))
+                {
+                    assemblies.Add(Path.GetFileName(dll), 1);
+                }
+            }
+
+            SetAssemblyLog(assemblyLogPath, assemblies);
+
+            return assemblies.Count;
+        }
+
+        private string GetAssemblyLogPath()
+        {
+            string packagesFolder = Path.Combine(_environment.ContentRootPath, Constants.PackagesFolder);
+            if (!Directory.Exists(packagesFolder))
+            {
+                Directory.CreateDirectory(packagesFolder);
+            }
+            return Path.Combine(packagesFolder, "assemblies.log");
+        }
+
+        private static Dictionary<string, int> GetAssemblyLog(string assemblyLogPath)
+        {
+            Dictionary<string, int> assemblies = new Dictionary<string, int>();
+            if (File.Exists(assemblyLogPath))
+            {
+                assemblies = JsonSerializer.Deserialize<Dictionary<string, int>>(File.ReadAllText(assemblyLogPath));
+            }
+            return assemblies;
+        }
+
+        private static void SetAssemblyLog(string assemblyLogPath, Dictionary<string, int> assemblies)
+        {
+            if (File.Exists(assemblyLogPath))
+            {
+                File.Delete(assemblyLogPath);
+            }
+            File.WriteAllText(assemblyLogPath, JsonSerializer.Serialize(assemblies, new JsonSerializerOptions { WriteIndented = true }));
+        }
+
+        public async Task UpgradeFramework()
         {
             string folder = Path.Combine(_environment.ContentRootPath, Constants.PackagesFolder);
             if (Directory.Exists(folder))
@@ -364,14 +448,14 @@ namespace Oqtane.Infrastructure
                         // install Oqtane.Upgrade zip package
                         if (File.Exists(upgradepackage))
                         {
-                            FinishUpgrade(backup);
+                            FinishUpgrade();
                         }
                     }
                 }
             }
         }
 
-        private void FinishUpgrade(bool backup)
+        private void FinishUpgrade()
         {
             // check if updater application exists
             string Updater = Constants.UpdaterPackageId + ".dll";
@@ -385,7 +469,7 @@ namespace Oqtane.Infrastructure
                 {
                     WorkingDirectory = folder,
                     FileName = "dotnet",
-                    Arguments = Path.Combine(folder, Updater) + " \"" + _environment.ContentRootPath + "\" \"" + _environment.WebRootPath + "\" \"" + backup.ToString() + "\"",
+                    Arguments = Path.Combine(folder, Updater) + " \"" + _environment.ContentRootPath + "\" \"" + _environment.WebRootPath + "\"",
                     UseShellExecute = false,
                     ErrorDialog = false,
                     CreateNoWindow = true,

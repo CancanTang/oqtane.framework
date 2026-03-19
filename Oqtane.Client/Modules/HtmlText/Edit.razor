@@ -31,8 +31,8 @@
 				<th style="width: 1px;">&nbsp;</th>
 				<th style="width: 1px;">&nbsp;</th>
 				<th style="width: 1px;">&nbsp;</th>
-				<th>@Localizer["CreatedOn"]</th>
-				<th>@Localizer["CreatedBy"]</th>
+				<th>@SharedLocalizer["CreatedOn"]</th>
+				<th>@SharedLocalizer["CreatedBy"]</th>
 			</Header>
 			<Row>
 				<td><ActionLink Action="View" Security="SecurityAccessLevel.Edit" OnClick="@(async () => await View(context))" ResourceKey="View" /></td>
@@ -122,9 +122,13 @@
 	{
 		try
 		{
-			_view = htmltext.Content;
-			_view = Utilities.FormatContent(_view, PageState.Alias, "render");
-			StateHasChanged();
+			htmltext = await HtmlTextService.GetHtmlTextAsync(htmltext.HtmlTextId, htmltext.ModuleId);
+			if (htmltext != null)
+			{
+				_view = htmltext.Content;
+				_view = Utilities.FormatContent(_view, PageState.Alias, "render");
+				StateHasChanged();
+			}		
 		}
 		catch (Exception ex)
 		{
@@ -137,15 +141,19 @@
 	{
 		try
 		{
-			var content = htmltext.Content;
-			htmltext = new HtmlText();
-			htmltext.ModuleId = ModuleState.ModuleId;
-			htmltext.Content = content;
-			await HtmlTextService.AddHtmlTextAsync(htmltext);
-			await logger.LogInformation("Content Restored {HtmlText}", htmltext);
-			AddModuleMessage(Localizer["Message.Content.Restored"], MessageType.Success);
-			await LoadContent();
-			StateHasChanged();
+			htmltext = await HtmlTextService.GetHtmlTextAsync(htmltext.HtmlTextId, ModuleState.ModuleId);
+			if (htmltext != null)
+			{
+				var content = htmltext.Content;
+				htmltext = new HtmlText();
+				htmltext.ModuleId = ModuleState.ModuleId;
+				htmltext.Content = content;
+				await HtmlTextService.AddHtmlTextAsync(htmltext);
+				await logger.LogInformation("Content Restored {HtmlText}", htmltext);
+				AddModuleMessage(Localizer["Message.Content.Restored"], MessageType.Success);
+				await LoadContent();
+				StateHasChanged();
+			}				
 		}
 		catch (Exception ex)
 		{
@@ -158,11 +166,15 @@
 	{
 		try
 		{
-			await HtmlTextService.DeleteHtmlTextAsync(htmltext.HtmlTextId, htmltext.ModuleId);
-			await logger.LogInformation("Content Deleted {HtmlText}", htmltext);
-			AddModuleMessage(Localizer["Message.Content.Deleted"], MessageType.Success);
-			await LoadContent();
-			StateHasChanged();
+			htmltext = await HtmlTextService.GetHtmlTextAsync(htmltext.HtmlTextId, ModuleState.ModuleId);
+			if (htmltext != null)
+			{
+				await HtmlTextService.DeleteHtmlTextAsync(htmltext.HtmlTextId, htmltext.ModuleId);
+				await logger.LogInformation("Content Deleted {HtmlText}", htmltext);
+				AddModuleMessage(Localizer["Message.Content.Deleted"], MessageType.Success);
+				await LoadContent();
+				StateHasChanged();
+			}		
 		}
 		catch (Exception ex)
 		{

@@ -5,32 +5,31 @@ using Microsoft.AspNetCore.Http;
 using Oqtane.Shared;
 using Oqtane.Enums;
 using Oqtane.Infrastructure;
-using [Owner].Module.[Module].Services;
+using [Owner].Module.[Module].Repository;
 using Oqtane.Controllers;
 using System.Net;
-using System.Threading.Tasks;
 
 namespace [Owner].Module.[Module].Controllers
 {
     [Route(ControllerRoutes.ApiRoute)]
     public class [Module]Controller : ModuleControllerBase
     {
-        private readonly I[Module]Service _[Module]Service;
+        private readonly I[Module]Repository _[Module]Repository;
 
-        public [Module]Controller(I[Module]Service [Module]Service, ILogManager logger, IHttpContextAccessor accessor) : base(logger, accessor)
+        public [Module]Controller(I[Module]Repository [Module]Repository, ILogManager logger, IHttpContextAccessor accessor) : base(logger, accessor)
         {
-            _[Module]Service = [Module]Service;
+            _[Module]Repository = [Module]Repository;
         }
 
         // GET: api/<controller>?moduleid=x
         [HttpGet]
         [Authorize(Policy = PolicyNames.ViewModule)]
-        public async Task<IEnumerable<Models.[Module]>> Get(string moduleid)
+        public IEnumerable<Models.[Module]> Get(string moduleid)
         {
             int ModuleId;
             if (int.TryParse(moduleid, out ModuleId) && IsAuthorizedEntityId(EntityNames.Module, ModuleId))
             {
-                return await _[Module]Service.Get[Module]sAsync(ModuleId);
+                return _[Module]Repository.Get[Module]s(ModuleId);
             }
             else
             {
@@ -41,18 +40,18 @@ namespace [Owner].Module.[Module].Controllers
         }
 
         // GET api/<controller>/5
-        [HttpGet("{id}/{moduleid}")]
+        [HttpGet("{id}")]
         [Authorize(Policy = PolicyNames.ViewModule)]
-        public async Task<Models.[Module]> Get(int id, int moduleid)
+        public Models.[Module] Get(int id)
         {
-            Models.[Module] [Module] = await _[Module]Service.Get[Module]Async(id, moduleid);
+            Models.[Module] [Module] = _[Module]Repository.Get[Module](id);
             if ([Module] != null && IsAuthorizedEntityId(EntityNames.Module, [Module].ModuleId))
             {
                 return [Module];
             }
             else
             { 
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized [Module] Get Attempt {[Module]Id} {ModuleId}", id, moduleid);
+                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized [Module] Get Attempt {[Module]Id}", id);
                 HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
                 return null;
             }
@@ -61,11 +60,12 @@ namespace [Owner].Module.[Module].Controllers
         // POST api/<controller>
         [HttpPost]
         [Authorize(Policy = PolicyNames.EditModule)]
-        public async Task<Models.[Module]> Post([FromBody] Models.[Module] [Module])
+        public Models.[Module] Post([FromBody] Models.[Module] [Module])
         {
             if (ModelState.IsValid && IsAuthorizedEntityId(EntityNames.Module, [Module].ModuleId))
             {
-                [Module] = await _[Module]Service.Add[Module]Async([Module]);
+                [Module] = _[Module]Repository.Add[Module]([Module]);
+                _logger.Log(LogLevel.Information, this, LogFunction.Create, "[Module] Added {[Module]}", [Module]);
             }
             else
             {
@@ -79,11 +79,12 @@ namespace [Owner].Module.[Module].Controllers
         // PUT api/<controller>/5
         [HttpPut("{id}")]
         [Authorize(Policy = PolicyNames.EditModule)]
-        public async Task<Models.[Module]> Put(int id, [FromBody] Models.[Module] [Module])
+        public Models.[Module] Put(int id, [FromBody] Models.[Module] [Module])
         {
-            if (ModelState.IsValid && [Module].[Module]Id == id && IsAuthorizedEntityId(EntityNames.Module, [Module].ModuleId))
+            if (ModelState.IsValid && [Module].[Module]Id == id && IsAuthorizedEntityId(EntityNames.Module, [Module].ModuleId) && _[Module]Repository.Get[Module]([Module].[Module]Id, false) != null)
             {
-                [Module] = await _[Module]Service.Update[Module]Async([Module]);
+                [Module] = _[Module]Repository.Update[Module]([Module]);
+                _logger.Log(LogLevel.Information, this, LogFunction.Update, "[Module] Updated {[Module]}", [Module]);
             }
             else
             {
@@ -95,18 +96,19 @@ namespace [Owner].Module.[Module].Controllers
         }
 
         // DELETE api/<controller>/5
-        [HttpDelete("{id}/{moduleid}")]
+        [HttpDelete("{id}")]
         [Authorize(Policy = PolicyNames.EditModule)]
-        public async Task Delete(int id, int moduleid)
+        public void Delete(int id)
         {
-            Models.[Module] [Module] = await _[Module]Service.Get[Module]Async(id, moduleid);
+            Models.[Module] [Module] = _[Module]Repository.Get[Module](id);
             if ([Module] != null && IsAuthorizedEntityId(EntityNames.Module, [Module].ModuleId))
             {
-                await _[Module]Service.Delete[Module]Async(id, [Module].ModuleId);
+                _[Module]Repository.Delete[Module](id);
+                _logger.Log(LogLevel.Information, this, LogFunction.Delete, "[Module] Deleted {[Module]Id}", id);
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized [Module] Delete Attempt {[Module]Id} {ModuleId}", id, moduleid);
+                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized [Module] Delete Attempt {[Module]Id}", id);
                 HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
             }
         }

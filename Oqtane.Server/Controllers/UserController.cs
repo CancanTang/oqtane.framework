@@ -1,21 +1,20 @@
-using System.Buffers.Text;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Security.Claims;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Oqtane.Enums;
-using Oqtane.Extensions;
-using Oqtane.Infrastructure;
-using Oqtane.Managers;
 using Oqtane.Models;
+using System.Threading.Tasks;
+using System.Linq;
+using System.Security.Claims;
+using Oqtane.Shared;
+using System;
+using System.Net;
+using Oqtane.Enums;
+using Oqtane.Infrastructure;
 using Oqtane.Repository;
 using Oqtane.Security;
-using Oqtane.Shared;
+using Oqtane.Extensions;
+using Oqtane.Managers;
+using System.Collections.Generic;
 
 namespace Oqtane.Controllers
 {
@@ -29,11 +28,9 @@ namespace Oqtane.Controllers
         private readonly IUserPermissions _userPermissions;
         private readonly IJwtManager _jwtManager;
         private readonly IFileRepository _files;
-        private readonly ISettingRepository _settings;
-        private readonly ISyncManager _syncManager;
         private readonly ILogManager _logger;
 
-        public UserController(IUserRepository users, ITenantManager tenantManager, IUserManager userManager, ISiteRepository sites, IUserPermissions userPermissions, IJwtManager jwtManager, IFileRepository files, ISettingRepository settings, ISyncManager syncManager, ILogManager logger)
+        public UserController(IUserRepository users, ITenantManager tenantManager, IUserManager userManager, ISiteRepository sites, IUserPermissions userPermissions, IJwtManager jwtManager, IFileRepository files, ILogManager logger)
         {
             _users = users;
             _tenantManager = tenantManager;
@@ -42,8 +39,6 @@ namespace Oqtane.Controllers
             _userPermissions = userPermissions;
             _jwtManager = jwtManager;
             _files = files;
-            _settings = settings;
-            _syncManager = syncManager;
             _logger = logger;
         }
 
@@ -115,47 +110,31 @@ namespace Oqtane.Controllers
 
         private User Filter(User user)
         {
-            // clone object to avoid mutating cache 
-            User filtered = null;
-
             if (user != null)
             {
-                filtered = new User();
+                user.Password = "";
+                user.IsAuthenticated = false;
+                user.TwoFactorCode = "";
+                user.TwoFactorExpiry = null;
 
-                // public properties
-                filtered.SiteId = user.SiteId;
-                filtered.UserId = user.UserId;
-                filtered.Username = user.Username;
-                filtered.DisplayName = user.DisplayName;
-
-                // restricted properties
-                filtered.Password = "";
-                filtered.TwoFactorCode = "";
-                filtered.SecurityStamp = "";
-
-                // include private properties if authenticated user is accessing their own user account or is an administrator
-                if (_userPermissions.IsAuthorized(User, user.SiteId, EntityNames.User, -1, PermissionNames.Write, RoleNames.Admin) || _userPermissions.GetUser(User).UserId == user.UserId)
+                if (!_userPermissions.IsAuthorized(User, user.SiteId, EntityNames.User, -1, PermissionNames.Write, RoleNames.Admin) && User.Identity.Name?.ToLower() != user.Username.ToLower())
                 {
-                    filtered.Email = user.Email;
-                    filtered.TimeZoneId = user.TimeZoneId;
-                    filtered.PhotoFileId = user.PhotoFileId;
-                    filtered.LastLoginOn = user.LastLoginOn;
-                    filtered.LastIPAddress = user.LastIPAddress;
-                    filtered.TwoFactorRequired = user.TwoFactorRequired;
-                    filtered.EmailConfirmed = user.EmailConfirmed;
-                    filtered.Roles = user.Roles;
-                    filtered.CreatedBy = user.CreatedBy;
-                    filtered.CreatedOn = user.CreatedOn;
-                    filtered.ModifiedBy = user.ModifiedBy;
-                    filtered.ModifiedOn = user.ModifiedOn;
-                    filtered.DeletedBy = user.DeletedBy;
-                    filtered.DeletedOn = user.DeletedOn;
-                    filtered.IsDeleted = user.IsDeleted;
-                    filtered.Settings = user.Settings; // include all settings
+                    user.Email = "";
+                    user.PhotoFileId = null;
+                    user.LastLoginOn = DateTime.MinValue;
+                    user.LastIPAddress = "";
+                    user.Roles = "";
+                    user.CreatedBy = "";
+                    user.CreatedOn = DateTime.MinValue;
+                    user.ModifiedBy = "";
+                    user.ModifiedOn = DateTime.MinValue;
+                    user.DeletedBy = "";
+                    user.DeletedOn = DateTime.MinValue;
+                    user.IsDeleted = false;
+                    user.TwoFactorRequired = false;
                 }
             }
-
-            return filtered;
+            return user;
         }
 
         // POST api/<controller>
@@ -167,13 +146,12 @@ namespace Oqtane.Controllers
                 bool allowregistration;
                 if (_userPermissions.IsAuthorized(User, user.SiteId, EntityNames.User, -1, PermissionNames.Write, RoleNames.Admin))
                 {
-                    user.IsAuthenticated = true; // admins can add any existing user to a site
+                    user.EmailConfirmed = true;
                     allowregistration = true;
                 }
                 else
                 {
-                    user.EmailConfirmed = false; // standard users cannot specify that their email is verified
-                    user.IsAuthenticated = false; // existing users can only be added to a site if they provide a valid username and password
+                    user.EmailConfirmed = false;
                     allowregistration = _sites.GetSite(user.SiteId).AllowRegistration;
                 }
 
@@ -202,15 +180,10 @@ namespace Oqtane.Controllers
         [Authorize]
         public async Task<User> Put(int id, [FromBody] User user)
         {
-            var existing = _userManager.GetUser(user.UserId, user.SiteId);
-            if (ModelState.IsValid && user.SiteId == _tenantManager.GetAlias().SiteId && user.UserId == id && existing != null
+            if (ModelState.IsValid && user.SiteId == _tenantManager.GetAlias().SiteId && user.UserId == id && _users.GetUser(user.UserId, false) != null
                 && (_userPermissions.IsAuthorized(User, user.SiteId, EntityNames.User, -1, PermissionNames.Write, RoleNames.Admin) || User.Identity.Name == user.Username))
             {
-                // only authorized users can update the email confirmation
-                if (!_userPermissions.IsAuthorized(User, user.SiteId, EntityNames.User, -1, PermissionNames.Write, RoleNames.Admin))
-                {
-                    user.EmailConfirmed = existing.EmailConfirmed;
-                }
+                user.EmailConfirmed = User.IsInRole(RoleNames.Admin);
                 user = await _userManager.UpdateUser(user);
             }
             else
@@ -225,7 +198,7 @@ namespace Oqtane.Controllers
 
         // DELETE api/<controller>/5?siteid=x
         [HttpDelete("{id}")]
-        [Authorize(Policy = $"{EntityNames.User}:{PermissionNames.Write}:{RoleNames.Host}")]
+        [Authorize(Policy = $"{EntityNames.User}:{PermissionNames.Write}:{RoleNames.Admin}")]
         public async Task Delete(int id, string siteid)
         {
             User user = _users.GetUser(id, false);
@@ -240,8 +213,8 @@ namespace Oqtane.Controllers
             }
         }
 
-        // POST api/<controller>/signin
-        [HttpPost("signin")]
+        // POST api/<controller>/login
+        [HttpPost("login")]
         public async Task<User> Login([FromBody] User user, bool setCookie, bool isPersistent)
         {
             if (ModelState.IsValid)
@@ -260,26 +233,8 @@ namespace Oqtane.Controllers
         [Authorize]
         public async Task Logout([FromBody] User user)
         {
-            if (_userPermissions.GetUser(User).UserId == user.UserId)
-            {
-                await HttpContext.SignOutAsync(Constants.AuthenticationScheme);
-                _syncManager.AddSyncEvent(_tenantManager.GetAlias(), EntityNames.User, user.UserId, "Logout");
-                _logger.Log(LogLevel.Information, this, LogFunction.Security, "User Logout {Username}", (user != null) ? user.Username : "");
-            }
-        }
-
-        // POST api/<controller>/logout
-        [HttpPost("logouteverywhere")]
-        [Authorize]
-        public async Task LogoutEverywhere([FromBody] User user)
-        {
-            if (_userPermissions.GetUser(User).UserId == user.UserId)
-            {
-                await _userManager.LogoutUserEverywhere(user);
-                await HttpContext.SignOutAsync(Constants.AuthenticationScheme);
-                _syncManager.AddSyncEvent(_tenantManager.GetAlias(), EntityNames.User, user.UserId, "Logout");
-                _logger.Log(LogLevel.Information, this, LogFunction.Security, "User Logout Everywhere {Username}", (user != null) ? user.Username : "");
-            }
+            await HttpContext.SignOutAsync(Constants.AuthenticationScheme);
+            _logger.Log(LogLevel.Information, this, LogFunction.Security, "User Logout {Username}", (user != null) ? user.Username : "");
         }
 
         // POST api/<controller>/verify
@@ -293,18 +248,14 @@ namespace Oqtane.Controllers
             return user;
         }
 
-        // GET api/<controller>/forgotpassword/x
-        [HttpGet("forgotpassword/{username}")]
-        public async Task<bool> ForgotPassword(string username)
+        // POST api/<controller>/forgot
+        [HttpPost("forgot")]
+        public async Task Forgot([FromBody] User user)
         {
-            return await _userManager.ForgotPassword(username);
-        }
-
-        // GET api/<controller>/forgotusername/x
-        [HttpGet("forgotusername/{email}")]
-        public async Task<bool> ForgotUsername(string email)
-        {
-            return await _userManager.ForgotUsername(email);
+            if (ModelState.IsValid)
+            {
+                await _userManager.ForgotPassword(user);
+            }
         }
 
         // POST api/<controller>/reset
@@ -334,11 +285,20 @@ namespace Oqtane.Controllers
             return user;
         }
 
-        // GET api/<controller>/validate/x
-        [HttpGet("validateuser")]
-        public async Task<UserValidateResult> ValidateUser(string username, string email, string password)
+        // POST api/<controller>/link
+        [HttpPost("link")]
+        public async Task<User> Link([FromBody] User user, string token, string type, string key, string name)
         {
-            return await _userManager.ValidateUser(username, email, password);
+            if (ModelState.IsValid)
+            {
+                user = await _userManager.LinkExternalAccount(user, token, type, key, name);
+            }
+            else
+            {
+                _logger.Log(LogLevel.Error, this, LogFunction.Security, "External Login Linkage Failed For {Username} And Token {Token}", user.Username, token);
+                user = null;
+            }
+            return user;
         }
 
         // GET api/<controller>/validate/x
@@ -395,7 +355,6 @@ namespace Oqtane.Controllers
                 }
                 if (roles != "") roles = ";" + roles;
                 user.Roles = roles;
-                user.SecurityStamp = User.SecurityStamp();
             }
             return user;
         }
@@ -418,120 +377,40 @@ namespace Oqtane.Controllers
             return requirements;
         }
 
-        // GET: api/<controller>/passkey?id=x
-        [HttpGet("passkey")]
-        [Authorize]
-        public async Task<IEnumerable<UserPasskey>> GetPasskeys(int id)
+        // POST api/<controller>/import?siteid=x&fileid=y&notify=z
+        [HttpPost("import")]
+        [Authorize(Roles = RoleNames.Admin)]
+        public async Task<Dictionary<string, string>> Import(string siteid, string fileid, string notify)
         {
-            if (_userPermissions.IsAuthorized(User, _tenantManager.GetAlias().SiteId, EntityNames.User, -1, PermissionNames.Write, RoleNames.Admin) || _userPermissions.GetUser(User).UserId == id)
+            if (int.TryParse(siteid, out int SiteId) && SiteId == _tenantManager.GetAlias().SiteId && int.TryParse(fileid, out int FileId) && bool.TryParse(notify, out bool Notify))
             {
-                return await _userManager.GetPasskeys(id, _tenantManager.GetAlias().SiteId);
-            }
-            else
-            {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized User Passkey Get Attempt {UserId} {SiteId}", id, _tenantManager.GetAlias().SiteId);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
-                return null;
-            }
-        }
-
-        // PUT api/<controller>/passkey
-        [HttpPut("passkey")]
-        [Authorize]
-        public async Task UpdatePasskey([FromBody] UserPasskey passkey)
-        {
-            if (ModelState.IsValid)
-            {
-                if (_userPermissions.IsAuthorized(User, _tenantManager.GetAlias().SiteId, EntityNames.User, -1, PermissionNames.Write, RoleNames.Admin) || _userPermissions.GetUser(User).UserId == passkey.UserId)
+                var file = _files.GetFile(FileId);
+                if (file != null)
                 {
-                    // passkey name is prefixed with SiteId for multi-tenancy
-                    passkey.Name = $"{_tenantManager.GetAlias().SiteId}:" + passkey.Name;
-                    await _userManager.UpdatePasskey(passkey);
+                    if (_userPermissions.IsAuthorized(User, PermissionNames.View, file.Folder.PermissionList))
+                    {
+                        return await _userManager.ImportUsers(SiteId, _files.GetFilePath(file), Notify);
+                    }
+                    else
+                    {
+                        _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized User Import Attempt {SiteId} {FileId}", siteid, fileid);
+                        HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                        return null;
+                    }
                 }
                 else
                 {
-                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized User Passkey Put Attempt {PassKey}", passkey);
-                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Import File Does Not Exist {SiteId} {FileId}", siteid, fileid);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                    return null;
                 }
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized User Passkey Put Attempt {PassKey}", passkey);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
-            }
-        }
-
-        // DELETE api/<controller>/passkey?id=x&credential=y
-        [HttpDelete("passkey")]
-        [Authorize]
-        public async Task DeletePasskey(int id, string credential)
-        {
-            if (_userPermissions.IsAuthorized(User, _tenantManager.GetAlias().SiteId, EntityNames.User, -1, PermissionNames.Write, RoleNames.Admin) || _userPermissions.GetUser(User).UserId == id)
-            {
-                await _userManager.DeletePasskey(id, Base64Url.DecodeFromChars(credential));
-            }
-            else
-            {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized User Passkey Delete Attempt {UserId} {Credential}", id, credential);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
-            }
-        }
-
-        // GET: api/<controller>/login?id=x
-        [HttpGet("login")]
-        [Authorize]
-        public async Task<IEnumerable<UserLogin>> GetLogins(int id)
-        {
-            if (_userPermissions.IsAuthorized(User, _tenantManager.GetAlias().SiteId, EntityNames.User, -1, PermissionNames.Write, RoleNames.Admin) || _userPermissions.GetUser(User).UserId == id)
-            {
-                return await _userManager.GetLogins(id, _tenantManager.GetAlias().SiteId);
-            }
-            else
-            {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized External Login Get Attempt {UserId} {SiteId}", id, _tenantManager.GetAlias().SiteId);
+                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized User Import Attempt {SiteId} {FileId}", siteid, fileid);
                 HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
                 return null;
             }
-        }
-
-        // PUT api/<controller>/login
-        [HttpPost("login")]
-        public async Task<User> AddLogin([FromBody] User user, string token, string type, string key, string name)
-        {
-            if (ModelState.IsValid)
-            {
-                user = await _userManager.AddLogin(user, token, type, key, name);
-            }
-            else
-            {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized External Login Post Attempt {Username} {Token}", user.Username, token);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
-                user = null;
-            }
-            return user;
-        }
-
-        // DELETE api/<controller>/login?id=x&provider=y&key=z
-        [HttpDelete("login")]
-        [Authorize]
-        public async Task DeleteLogin(int id, string provider, string key)
-        {
-            if (_userPermissions.IsAuthorized(User, _tenantManager.GetAlias().SiteId, EntityNames.User, -1, PermissionNames.Write, RoleNames.Admin) || _userPermissions.GetUser(User).UserId == id)
-            {
-                await _userManager.DeleteLogin(id, provider, key);
-            }
-            else
-            {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized External Login Delete Attempt {UserId} {Provider} {Key}", id, provider, key);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
-            }
-        }
-
-        // GET api/<controller>/loginlink/x/y
-        [HttpGet("loginlink/{email}/{returnurl}")]
-        public async Task<bool> SendLoginLink(string email, string returnurl)
-        {
-            return await _userManager.SendLoginLink(email, returnurl);
         }
     }
 }

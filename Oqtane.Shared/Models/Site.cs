@@ -17,19 +17,14 @@ namespace Oqtane.Models
         public int SiteId { get; set; }
 
         /// <summary>
+        /// Reference to the <see cref="Tenant"/> the Site is in
+        /// </summary>
+        public int TenantId { get; set; }
+
+        /// <summary>
         /// The site Name
         /// </summary>
         public string Name { get; set; }
-
-        /// <summary>
-        /// The default time zone for the site
-        /// </summary>
-        public string TimeZoneId { get; set; }
-
-        /// <summary>
-        /// The default culture for the site (ie. en-US)
-        /// </summary>
-        public string CultureCode { get; set; }
 
         /// <summary>
         /// Reference to a <see cref="File"/> which has the Logo for this site.
@@ -101,7 +96,7 @@ namespace Oqtane.Models
         public string RenderMode { get; set; }
 
         /// <summary>
-        /// The hosting model for UI components which require interactivity ie. Server,WebAssembly,Auto
+        /// The render mode for UI components which require interactivity ie. Server,WebAssembly,Auto
         /// </summary>
         public string Runtime { get; set; }
 
@@ -116,14 +111,14 @@ namespace Oqtane.Models
         public bool Hybrid { get; set; }
 
         /// <summary>
-        /// Indicates if enhanced navigation should be used with static rendering
-        /// </summary>
-        public bool EnhancedNavigation { get; set; }
-
-        /// <summary>
         /// Keeps track of site configuration changes and is used by the ISiteMigration interface
         /// </summary>
         public string Version { get; set; }
+
+        /// <summary>
+        /// The home page of the site - the "/" path will be used by default if no home page is specified
+        /// </summary>
+        public int? HomePageId { get; set; }
 
         /// <summary>
         /// Content to be included in the head of the page
@@ -192,69 +187,47 @@ namespace Oqtane.Models
         [NotMapped]
         public List<Theme> Themes { get; set; }
 
-        /// <summary>
-        /// Current user
-        /// </summary>
-        [NotMapped]
-        public User User { get; set; }
-
-        /// <summary>
-        /// fingerprint for framework static assets
-        /// </summary>
-        [NotMapped]
-        public string Fingerprint { get; set; }
-
-        /// <summary>
-        /// Reference to the <see cref="Tenant"/> the Site belongs to
-        /// </summary>
-        [NotMapped]
-        public int TenantId { get; set; }
-
-        public Site Clone()
+        public Site Clone(Site site)
         {
             return new Site
             {
-                SiteId = SiteId,
-                Name = Name,
-                TimeZoneId = TimeZoneId,
-                CultureCode = CultureCode,
-                LogoFileId = LogoFileId,
-                FaviconFileId = FaviconFileId,
-                DefaultThemeType = DefaultThemeType,
-                DefaultContainerType = DefaultContainerType,
-                AdminContainerType = AdminContainerType,
-                PwaIsEnabled = PwaIsEnabled,
-                PwaAppIconFileId = PwaAppIconFileId,
-                PwaSplashIconFileId = PwaSplashIconFileId,
-                AllowRegistration = AllowRegistration,
-                VisitorTracking = VisitorTracking,
-                CaptureBrokenUrls = CaptureBrokenUrls,
-                SiteGuid = SiteGuid,
-                RenderMode = RenderMode,
-                Runtime = Runtime,
-                Prerender = Prerender,
-                Hybrid = Hybrid,
-                EnhancedNavigation = EnhancedNavigation,
-                Version = Version,
-                HeadContent = HeadContent,
-                BodyContent = BodyContent,
-                IsDeleted = IsDeleted,
-                DeletedBy = DeletedBy,
-                DeletedOn = DeletedOn,
-                ImageFiles = ImageFiles,
-                UploadableFiles = UploadableFiles,
-                SiteTemplateType = SiteTemplateType,
-                CreatedBy = CreatedBy,
-                CreatedOn = CreatedOn,
-                ModifiedBy = ModifiedBy,
-                ModifiedOn = ModifiedOn,
-                Settings = Settings.ToDictionary(setting => setting.Key, setting => setting.Value),
-                Pages = Pages.ConvertAll(page => page.Clone()),
-                Languages = Languages.ConvertAll(language => language.Clone()),
-                Themes = Themes,
-                User = User?.Clone(),
-                Fingerprint = Fingerprint,
-                TenantId = TenantId
+                SiteId = site.SiteId,
+                TenantId = site.TenantId,
+                Name = site.Name,
+                LogoFileId = site.LogoFileId,
+                FaviconFileId = site.FaviconFileId,
+                DefaultThemeType = site.DefaultThemeType,
+                DefaultContainerType = site.DefaultContainerType,
+                AdminContainerType = site.AdminContainerType,
+                PwaIsEnabled = site.PwaIsEnabled,
+                PwaAppIconFileId = site.PwaAppIconFileId,
+                PwaSplashIconFileId = site.PwaSplashIconFileId,
+                AllowRegistration = site.AllowRegistration,
+                VisitorTracking = site.VisitorTracking,
+                CaptureBrokenUrls = site.CaptureBrokenUrls,
+                SiteGuid = site.SiteGuid,
+                RenderMode = site.RenderMode,
+                Runtime = site.Runtime,
+                Prerender = site.Prerender,
+                Hybrid = site.Hybrid,
+                Version = site.Version,
+                HomePageId = site.HomePageId,
+                HeadContent = site.HeadContent,
+                BodyContent = site.BodyContent,
+                IsDeleted = site.IsDeleted,
+                DeletedBy = site.DeletedBy,
+                DeletedOn = site.DeletedOn,
+                ImageFiles = site.ImageFiles,
+                UploadableFiles = site.UploadableFiles,
+                SiteTemplateType = site.SiteTemplateType,
+                CreatedBy = site.CreatedBy,
+                CreatedOn = site.CreatedOn,
+                ModifiedBy = site.ModifiedBy,
+                ModifiedOn = site.ModifiedOn,
+                Settings = site.Settings.ToDictionary(),
+                Pages = site.Pages.ToList(),
+                Languages = site.Languages.ToList(),
+                Themes = site.Themes.ToList()
             };
         }
 
@@ -262,10 +235,6 @@ namespace Oqtane.Models
         [NotMapped]
         [Obsolete("This property is deprecated.", false)]
         public string DefaultLayoutType { get; set; }
-
-        [NotMapped]
-        [Obsolete("This property is deprecated.", false)]
-        public int? HomePageId { get; set; }
         #endregion
     }
 }

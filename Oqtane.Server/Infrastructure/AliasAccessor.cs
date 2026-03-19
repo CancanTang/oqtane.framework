@@ -4,11 +4,6 @@ using Oqtane.Models;
 
 namespace Oqtane.Infrastructure
 {
-    public interface IAliasAccessor
-    {
-        Alias Alias { get; }
-    }
-
     public class AliasAccessor : IAliasAccessor
     {
         private readonly IHttpContextAccessor _httpContextAccessor;

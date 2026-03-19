@@ -8,6 +8,10 @@ using Oqtane.Infrastructure;
 using Oqtane.Repository;
 using Oqtane.Security;
 using System.Net;
+using System.Reflection.Metadata;
+using Microsoft.Extensions.Localization;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using System.Linq;
 
 namespace Oqtane.Controllers
 {
@@ -155,7 +159,7 @@ namespace Oqtane.Controllers
         [Authorize(Roles = RoleNames.Registered)]
         public Notification Post([FromBody] Notification notification)
         {
-            if (ModelState.IsValid && notification.SiteId == _alias.SiteId && (IsAuthorized(notification.FromUserId) || (notification.FromUserId == null && User.IsInRole(RoleNames.Admin))))
+            if (ModelState.IsValid && notification.SiteId == _alias.SiteId && IsAuthorized(notification.FromUserId))
             {
                 if (!User.IsInRole(RoleNames.Admin))
                 {
@@ -181,45 +185,17 @@ namespace Oqtane.Controllers
         [Authorize(Roles = RoleNames.Registered)]
         public Notification Put(int id, [FromBody] Notification notification)
         {
-            if (ModelState.IsValid && notification.SiteId == _alias.SiteId && notification.NotificationId == id && _notifications.GetNotification(notification.NotificationId, false) != null)
+            if (ModelState.IsValid && notification.SiteId == _alias.SiteId && notification.NotificationId == id && _notifications.GetNotification(notification.NotificationId, false) != null && (IsAuthorized(notification.FromUserId) || IsAuthorized(notification.ToUserId)))
             {
-                bool update = false;
-                if (IsAuthorized(notification.FromUserId))
+                if (!User.IsInRole(RoleNames.Admin))
                 {
-                    // notification belongs to current authenticated user - update is allowed
-                    if (!User.IsInRole(RoleNames.Admin))
-                    {
-                        // content must be HTML encoded for non-admins to prevent HTML injection
-                        notification.Subject = WebUtility.HtmlEncode(notification.Subject);
-                        notification.Body = WebUtility.HtmlEncode(notification.Body);
-                    }
-                    update = true;
+                    // content must be HTML encoded for non-admins to prevent HTML injection
+                    notification.Subject = WebUtility.HtmlEncode(notification.Subject);
+                    notification.Body = WebUtility.HtmlEncode(notification.Body);
                 }
-                else
-                {
-                    if (IsAuthorized(notification.ToUserId))
-                    {
-                        // notification was sent to current authenticated user - only isread and isdeleted properties can be updated
-                        var isread = notification.IsRead;
-                        var isdeleted = notification.IsDeleted;
-                        notification = _notifications.GetNotification(notification.NotificationId);
-                        notification.IsRead = isread;
-                        notification.IsDeleted = isdeleted;
-                        update = true;
-                    }
-                }
-                if (update)
-                {
-                    notification = _notifications.UpdateNotification(notification);
-                    _syncManager.AddSyncEvent(_alias, EntityNames.Notification, notification.NotificationId, SyncEventActions.Update);
-                    _logger.Log(LogLevel.Information, this, LogFunction.Update, "Notification Updated {NotificationId}", notification.NotificationId);
-                }
-                else
-                {
-                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Notification Put Attempt {Notification}", notification);
-                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
-                    notification = null;
-                }
+                notification = _notifications.UpdateNotification(notification);
+                _syncManager.AddSyncEvent(_alias, EntityNames.Notification, notification.NotificationId, SyncEventActions.Update);
+                _logger.Log(LogLevel.Information, this, LogFunction.Update, "Notification Updated {NotificationId}", notification.NotificationId);
             }
             else
             {
@@ -251,7 +227,7 @@ namespace Oqtane.Controllers
 
         private bool IsAuthorized(int? userid)
         {
-            bool authorized = false;
+            bool authorized = true;
             if (userid != null)
             {
                 authorized = (_userPermissions.GetUser(User).UserId == userid);

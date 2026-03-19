@@ -1,28 +1,25 @@
-using System;
-using System.Collections.Generic;
-using System.Dynamic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
-using Oqtane.Enums;
-using Oqtane.Models;
-using Oqtane.Security;
-using Oqtane.Services;
 using Oqtane.Shared;
+using Oqtane.Models;
+using System.Threading.Tasks;
+using Oqtane.Services;
+using System;
+using Oqtane.Enums;
 using Oqtane.UI;
+using System.Collections.Generic;
+using Microsoft.JSInterop;
+using System.Linq;
+using System.Dynamic;
 
 namespace Oqtane.Modules
 {
     public abstract class ModuleBase : ComponentBase, IModuleControl
     {
         private Logger _logger;
-        private string _urlparametersstate = string.Empty;
+        private string _urlparametersstate;
         private Dictionary<string, string> _urlparameters;
-        private bool _scriptsloaded = false;
 
-        public Logger logger => _logger ?? (_logger = new Logger(this));
+        protected Logger logger => _logger ?? (_logger = new Logger(this));
 
         [Inject]
         protected ILogService LoggingService { get; set; }
@@ -37,7 +34,7 @@ namespace Oqtane.Modules
         protected PageState PageState { get; set; }
 
         [CascadingParameter]
-        protected Models.Module ModuleState { get; set; }
+        protected Module ModuleState { get; set; }
 
         [Parameter]
         public RenderModeBoundary RenderModeBoundary { get; set; }
@@ -63,7 +60,7 @@ namespace Oqtane.Modules
         public Dictionary<string, string> UrlParameters {
             get
             {
-                if (string.IsNullOrEmpty(_urlparametersstate) || _urlparametersstate != PageState.UrlParameters)
+                if (_urlparametersstate == null || _urlparametersstate != PageState.UrlParameters)
                 {
                     _urlparametersstate = PageState.UrlParameters;
                     _urlparameters = GetUrlParameters(UrlParametersTemplate);
@@ -80,21 +77,18 @@ namespace Oqtane.Modules
             {
                 List<Resource> resources = null;
                 var type = GetType();
-                if (type.IsSubclassOf(typeof(ModuleBase)))
+                if (type.BaseType == typeof(ModuleBase))
                 {
-                    if (type.IsSubclassOf(typeof(ModuleControlBase)))
+                    if (PageState.Page.Resources != null)
                     {
-                        if (Resources != null)
-                        {
-                            resources = Resources.Where(item => item.ResourceType == ResourceType.Script).ToList();
-                        }
+                        resources = PageState.Page.Resources.Where(item => item.ResourceType == ResourceType.Script && item.Level == ResourceLevel.Module && item.Namespace == type.Namespace).ToList();
                     }
-                    else // ModuleBase
+                }
+                else // modulecontrolbase
+                {
+                    if (Resources != null)
                     {
-                        if (PageState.Page.Resources != null)
-                        {
-                            resources = PageState.Page.Resources.Where(item => item.ResourceType == ResourceType.Script && item.Level == ResourceLevel.Module && item.Namespace == type.Namespace).ToList();
-                        }
+                        resources = Resources.Where(item => item.ResourceType == ResourceType.Script).ToList();
                     }
                 }
                 if (resources != null && resources.Any())
@@ -109,12 +103,12 @@ namespace Oqtane.Modules
                             if (!string.IsNullOrEmpty(resource.Url))
                             {
                                 var url = (resource.Url.Contains("://")) ? resource.Url : PageState.Alias.BaseUrl + resource.Url;
-                                scripts.Add(new { href = url, type = resource.Type ?? "", bundle = resource.Bundle ?? "", integrity = resource.Integrity ?? "", crossorigin = resource.CrossOrigin ?? "", location = resource.Location.ToString().ToLower(), dataAttributes = resource.DataAttributes });
+                                scripts.Add(new { href = url, bundle = resource.Bundle ?? "", integrity = resource.Integrity ?? "", crossorigin = resource.CrossOrigin ?? "", es6module = resource.ES6Module, location = resource.Location.ToString().ToLower() });
                             }
                             else
                             {
                                 inline += 1;
-                                await interop.IncludeScript(GetType().Namespace.ToLower() + inline.ToString(), "", "", "", resource.Type ?? "", resource.Content, resource.Location.ToString().ToLower());
+                                await interop.IncludeScript(GetType().Namespace.ToLower() + inline.ToString(), "", "", "", resource.Content, resource.Location.ToString().ToLower());
                             }
                         }
                     }
@@ -123,7 +117,6 @@ namespace Oqtane.Modules
                         await interop.IncludeScripts(scripts.ToArray());
                     }
                 }
-                _scriptsloaded = true;
             }
         }
 
@@ -132,55 +125,15 @@ namespace Oqtane.Modules
             return PageState?.RenderId == ModuleState?.RenderId;
         }
 
-        public bool ScriptsLoaded
-        {
-            get
-            {
-                return _scriptsloaded;
-            }
-        }
-
-        // path methods
+        // path method
 
         public string ModulePath()
         {
             return PageState?.Alias.BaseUrl + "/Modules/" + GetType().Namespace + "/";
         }
 
-        public string StaticAssetPath
-        {
-            get
-            {
-                // requires module to have implemented IModule
-                return PageState?.Alias.BaseUrl + "_content/" + ModuleState.ModuleDefinition?.PackageName + "/";
-            }
-        }
-
-        // fingerprint hash code for static assets
-
-        public string Fingerprint
-        {
-            get
-            {
-                return ModuleState.ModuleDefinition.Fingerprint;
-            }
-        }
-
-        // authorization methods
-
-        public bool IsAuthorizedRole(string roleName)
-        {
-            return UserSecurity.IsAuthorized(PageState.User, roleName);
-        }
-
-        public bool IsAuthorizedPermission(string permissionName)
-        {
-            return UserSecurity.IsAuthorized(PageState.User, permissionName, ModuleState.PermissionList);
-        }
-
         // url methods
 
-        // navigate url
         public string NavigateUrl()
         {
             return NavigateUrl(PageState.Page.Path);
@@ -196,65 +149,24 @@ namespace Oqtane.Modules
             return NavigateUrl(PageState.Page.Path, refresh);
         }
 
-        public string NavigateUrl(string path, string querystring)
+        public string NavigateUrl(string path, string parameters)
         {
-            return Utilities.NavigateUrl(PageState.Alias.Path, path, querystring);
-        }
-
-        public string NavigateUrl(string path, Dictionary<string, string> querystring)
-        {
-            return NavigateUrl(path, Utilities.CreateQueryString(querystring));
+            return Utilities.NavigateUrl(PageState.Alias.Path, path, parameters);
         }
 
         public string NavigateUrl(string path, bool refresh)
         {
-            return NavigateUrl(path, refresh ? "refresh" : "");
+            return Utilities.NavigateUrl(PageState.Alias.Path, path, refresh ? "refresh" : "");
         }
 
-        public string NavigateUrl(int moduleId, string action)
-        {
-            return EditUrl(PageState.Page.Path, moduleId, action, "");
-        }
-
-        public string NavigateUrl(int moduleId, string action, string querystring)
-        {
-            return EditUrl(PageState.Page.Path, moduleId, action, querystring);
-        }
-
-        public string NavigateUrl(int moduleId, string action, Dictionary<string, string> querystring)
-        {
-            return EditUrl(PageState.Page.Path, moduleId, action, querystring);
-        }
-
-        public string NavigateUrl(string path, int moduleId, string action)
-        {
-            return EditUrl(path, moduleId, action, "");
-        }
-
-        public string NavigateUrl(string path, int moduleId, string action, string querystring)
-        {
-            return EditUrl(path, moduleId, action, querystring);
-        }
-
-        public string NavigateUrl(string path, int moduleId, string action, Dictionary<string, string> querystring)
-        {
-            return EditUrl(path, moduleId, action, querystring);
-        }
-
-        // edit url
         public string EditUrl(string action)
         {
             return EditUrl(ModuleState.ModuleId, action);
         }
 
-        public string EditUrl(string action, string querystring)
+        public string EditUrl(string action, string parameters)
         {
-            return EditUrl(ModuleState.ModuleId, action, querystring);
-        }
-
-        public string EditUrl(string action, Dictionary<string, string> querystring)
-        {
-            return EditUrl(ModuleState.ModuleId, action, querystring);
+            return EditUrl(ModuleState.ModuleId, action, parameters);
         }
 
         public string EditUrl(int moduleId, string action)
@@ -262,27 +174,16 @@ namespace Oqtane.Modules
             return EditUrl(moduleId, action, "");
         }
 
-        public string EditUrl(int moduleId, string action, string querystring)
+        public string EditUrl(int moduleId, string action, string parameters)
         {
-            return EditUrl(PageState.Page.Path, moduleId, action, querystring);
+            return EditUrl(PageState.Page.Path, moduleId, action, parameters);
         }
 
-        public string EditUrl(int moduleId, string action, Dictionary<string, string> querystring)
+        public string EditUrl(string path, int moduleid, string action, string parameters)
         {
-            return EditUrl(PageState.Page.Path, moduleId, action, querystring);
+            return Utilities.EditUrl(PageState.Alias.Path, path, moduleid, action, parameters);
         }
 
-        public string EditUrl(string path, int moduleid, string action, string querystring)
-        {
-            return Utilities.EditUrl(PageState.Alias.Path, path, moduleid, action, querystring);
-        }
-
-        public string EditUrl(string path, int moduleid, string action, Dictionary<string, string> querystring)
-        {
-            return EditUrl(path, moduleid, action, Utilities.CreateQueryString(querystring));
-        }
-
-        // file url
         public string FileUrl(string folderpath, string filename)
         {
             return FileUrl(folderpath, filename, false);
@@ -301,8 +202,6 @@ namespace Oqtane.Modules
         {
             return Utilities.FileUrl(PageState.Alias, fileid, download);
         }
-
-        // image url
 
         public string ImageUrl(int fileid, int width, int height)
         {
@@ -372,11 +271,6 @@ namespace Oqtane.Modules
         }
 
         // UI methods
-        private static readonly string RenderModeBoundaryErrorMessage =
-            "RenderModeBoundary is not available. This method requires a RenderModeBoundary parameter. " +
-            "If you are using child components, ensure you pass the RenderModeBoundary property to the child component: " +
-            "<ChildComponent RenderModeBoundary=\"RenderModeBoundary\" />";
-
         public void AddModuleMessage(string message, MessageType type)
         {
             AddModuleMessage(message, type, "top");
@@ -384,47 +278,21 @@ namespace Oqtane.Modules
 
         public void AddModuleMessage(string message, MessageType type, string position)
         {
-            AddModuleMessage(message, type, position, MessageStyle.Alert);
-        }
-
-        public void AddModuleMessage(string message, MessageType type, MessageStyle style)
-        {
-            AddModuleMessage(message, type, "top", style);
-        }
-
-        public void AddModuleMessage(string message, MessageType type, string position, MessageStyle style)
-        {
-            if (RenderModeBoundary == null)
-            {
-                throw new InvalidOperationException(RenderModeBoundaryErrorMessage);
-            }
-            RenderModeBoundary.AddModuleMessage(message, type, position, style);
+            RenderModeBoundary.AddModuleMessage(message, type, position);
         }
 
         public void ClearModuleMessage()
         {
-            if (RenderModeBoundary == null)
-            {
-                throw new InvalidOperationException(RenderModeBoundaryErrorMessage);
-            }
             RenderModeBoundary.AddModuleMessage("", MessageType.Undefined);
         }
 
         public void ShowProgressIndicator()
         {
-            if (RenderModeBoundary == null)
-            {
-                throw new InvalidOperationException(RenderModeBoundaryErrorMessage);
-            }
             RenderModeBoundary.ShowProgressIndicator();
         }
 
         public void HideProgressIndicator()
         {
-            if (RenderModeBoundary == null)
-            {
-                throw new InvalidOperationException(RenderModeBoundaryErrorMessage);
-            }
             RenderModeBoundary.HideProgressIndicator();
         }
 
@@ -469,139 +337,6 @@ namespace Oqtane.Modules
         {
             var interop = new Interop(JSRuntime);
             await interop.ScrollTo(0, 0, "smooth");
-        }
-
-
-        // token replace methods
-
-        public string ReplaceTokens(string content)
-        {
-            return ReplaceTokens(content, null);
-        }
-
-        public string ReplaceTokens(string content, object obj)
-        {
-            // check for null or empty content
-            if (string.IsNullOrEmpty(content))
-            {
-                return content;
-            }
-            // Using StringBuilder avoids the performance penalty of repeated string allocations
-            // that occur with string.Replace or string concatenation inside loops.
-            var sb = new StringBuilder();
-            var cache = new Dictionary<string, string>(); // Cache to store resolved tokens
-            int index = 0;
-
-            // Loop through content to find and replace all tokens
-            while (index < content.Length)
-            {
-                int start = content.IndexOf('[', index); // Find start of token
-                if (start == -1)
-                {
-                    sb.Append(content, index, content.Length - index); // Append remaining content
-                    break;
-                }
-
-                int end = content.IndexOf(']', start); // Find end of token
-                if (end == -1)
-                {
-                    sb.Append(content, index, content.Length - index); // Append unmatched content
-                    break;
-                }
-
-                sb.Append(content, index, start - index); // Append content before token
-
-                string token = content.Substring(start + 1, end - start - 1); // Extract token without brackets
-                string[] parts = token.Split('|', 2); // Separate default fallback if present
-                string key = parts[0];
-                string fallback = parts.Length == 2 ? parts[1] : null;
-
-                if (!cache.TryGetValue(token, out string replacement)) // Check cache first
-                {
-                    replacement = "[" + token + "]"; // Default replacement is original token
-                    string[] segments = key.Split(':');
-
-                    if (segments.Length >= 2)
-                    {
-                        object current = GetTarget(segments[0], obj); // Start from root object
-                        for (int i = 1; i < segments.Length && current != null; i++)
-                        {
-                            var type = current.GetType();
-                            var prop = type.GetProperty(segments[i]);
-                            current = prop?.GetValue(current);
-                        }
-
-                        if (current != null)
-                        {
-                            replacement = current.ToString();
-                        }
-                        else if (fallback != null)
-                        {
-                            replacement = fallback; // Use fallback if available
-                        }
-                    }
-                    cache[token] = replacement; // Store in cache
-                }
-
-                sb.Append(replacement); // Append replacement value
-                index = end + 1; // Move index past token
-            }
-
-            return sb.ToString();
-        }
-
-        // Resolve the object instance for a given object name
-        // Easy to extend with additional object types
-        private object GetTarget(string name, object obj)
-        {
-            return name switch
-            {
-                "ModuleState" => ModuleState,
-                "PageState" => PageState,
-                _ => (obj != null && obj.GetType().Name == name) ? obj : null // Fallback to obj
-            };
-        }
-
-        // date conversion methods
-
-        public DateTime? UtcToLocal(DateTime? datetime)
-        {
-            // Early return if input is null
-            if (datetime == null || datetime.Value == DateTime.MinValue || datetime.Value == DateTime.MaxValue)
-                return datetime;
-
-            string timezoneId = null;
-
-            if (PageState.User != null && !string.IsNullOrEmpty(PageState.User.TimeZoneId))
-            {
-                timezoneId = PageState.User.TimeZoneId;
-            }
-            else if (!string.IsNullOrEmpty(PageState.Site.TimeZoneId))
-            {
-                timezoneId = PageState.Site.TimeZoneId;
-            }
-
-            return Utilities.UtcAsLocalDateTime(datetime, timezoneId);
-        }
-
-        public DateTime? LocalToUtc(DateTime? datetime)
-        {
-            // Early return if input is null
-            if (datetime == null || datetime.Value == DateTime.MinValue || datetime.Value == DateTime.MaxValue)
-                return datetime;
-
-            string timezoneId = null;
-
-            if (PageState.User != null && !string.IsNullOrEmpty(PageState.User.TimeZoneId))
-            {
-                timezoneId = PageState.User.TimeZoneId;
-            }
-            else if (!string.IsNullOrEmpty(PageState.Site.TimeZoneId))
-            {
-                timezoneId = PageState.Site.TimeZoneId;
-            }
-
-            return Utilities.LocalDateAndTimeAsUtc(datetime, timezoneId);
         }
 
         // logging methods

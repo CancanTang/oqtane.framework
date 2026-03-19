@@ -30,19 +30,20 @@ else
     [Parameter]
     public SecurityAccessLevel? Security { get; set; } // optional - can be used to specify SecurityAccessLevel
 
-    [Parameter]
-    public string RoleName { get; set; } // optional - can be used to specify Role allowed to view this tab
-
-    [Parameter]
-    public string PermissionName { get; set; } // optional - can be used to specify Permission allowed to view this tab
-
     protected override void OnParametersSet()
     {
         base.OnParametersSet();
 
         Parent.AddTabPanel((TabPanel)this);
 
-        Heading = string.IsNullOrEmpty(Heading) ? Localize(nameof(Name), Name) : Localize(nameof(Heading), Heading);
+        if (string.IsNullOrEmpty(Heading))
+        {
+            Heading = Localize(nameof(Name), Name);
+        }
+        else
+        {
+            Heading = Localize(nameof(Heading), Heading);
+        }
     }
 
     public string DisplayHeading()

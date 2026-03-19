@@ -60,9 +60,9 @@ namespace Oqtane.Controllers
             {
                 installation = _databaseManager.Install(config);
 
-                if (installation.Success)
+                if (installation.Success && config.Register)
                 {
-                    await RegisterContact(config.HostEmail, config.HostName, config.Register);
+                    await RegisterContact(config.HostEmail);
                 }
             }
             else
@@ -88,10 +88,10 @@ namespace Oqtane.Controllers
 
         [HttpGet("upgrade")]
         [Authorize(Roles = RoleNames.Host)]
-        public Installation Upgrade(string backup)
+        public Installation Upgrade()
         {
             var installation = new Installation { Success = true, Message = "" };
-            _installationManager.UpgradeFramework(bool.Parse(backup));
+            _installationManager.UpgradeFramework();
             return installation;
         }
 
@@ -171,8 +171,7 @@ namespace Oqtane.Controllers
                     }
                 }
                 return assemblyList;
-            }).ToList();
-
+            });
         }
 
         // GET api/<controller>/load?list=x,y
@@ -258,7 +257,7 @@ namespace Oqtane.Controllers
             }
         }
 
-        private async Task RegisterContact(string email, string name, bool register)
+        private async Task RegisterContact(string email)
         {
             try
             {
@@ -269,7 +268,7 @@ namespace Oqtane.Controllers
                     {
                         client.DefaultRequestHeaders.Add("Referer", HttpContext.Request.Scheme + "://" + HttpContext.Request.Host.Value);
                         client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue(Constants.PackageId, Constants.Version));
-                        var response = await client.GetAsync(new Uri(url + $"/api/registry/contact/?id={_configManager.GetInstallationId()}&email={WebUtility.UrlEncode(email)}&name={WebUtility.UrlEncode(name)}&register={register.ToString().ToLower()}")).ConfigureAwait(false);
+                        var response = await client.GetAsync(new Uri(url + $"/api/registry/contact/?id={_configManager.GetInstallationId()}&email={WebUtility.UrlEncode(email)}")).ConfigureAwait(false);
                     }
                 }
             }
@@ -277,6 +276,14 @@ namespace Oqtane.Controllers
             {
                 // error calling registry service
             }
+        }
+
+        // GET api/<controller>/register?email=x
+        [HttpPost("register")]
+        [Authorize(Roles = RoleNames.Host)]
+        public async Task Register(string email)
+        {
+            await RegisterContact(email);
         }
 
         public struct ClientAssembly
@@ -287,7 +294,7 @@ namespace Oqtane.Controllers
                 DateTime lastwritetime = System.IO.File.GetLastWriteTime(filepath);
                 if (hashfilename)
                 {
-                    HashedName = Utilities.GenerateSimpleHash(filepath) + "." + lastwritetime.ToString("yyyyMMddHHmmss") + Path.GetExtension(filepath);
+                    HashedName = GetDeterministicHashCode(filepath).ToString("X8") + "." + lastwritetime.ToString("yyyyMMddHHmmss") + Path.GetExtension(filepath);
                 }
                 else
                 {
@@ -298,5 +305,25 @@ namespace Oqtane.Controllers
             public string FilePath { get; private set; }
             public string HashedName { get; private set; }
         }
+
+        private static int GetDeterministicHashCode(string value)
+        {
+            unchecked
+            {
+                int hash1 = (5381 << 16) + 5381;
+                int hash2 = hash1;
+
+                for (int i = 0; i < value.Length; i += 2)
+                {
+                    hash1 = ((hash1 << 5) + hash1) ^ value[i];
+                    if (i == value.Length - 1)
+                        break;
+                    hash2 = ((hash2 << 5) + hash2) ^ value[i + 1];
+                }
+
+                return hash1 + (hash2 * 1566083941);
+            }
+        }
+
     }
 }

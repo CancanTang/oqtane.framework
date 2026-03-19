@@ -19,54 +19,26 @@ namespace Oqtane.Controllers
             _localizationManager = localizationManager;
         }
 
-        // GET: api/localization?installed=true/false
+        // GET: api/localization
         [HttpGet()]
         public IEnumerable<Culture> Get(bool installed)
         {
-            string[] cultureCodes;
+            string[] culturecodes;
             if (installed)
             {
-                cultureCodes = _localizationManager.GetInstalledCultures();
+                culturecodes = _localizationManager.GetInstalledCultures();
             }
             else
             {
-                cultureCodes = _localizationManager.GetSupportedCultures();
+                culturecodes = _localizationManager.GetSupportedCultures();
             }
-
-            var cultures = cultureCodes.Select(c => new Culture
+            var cultures = culturecodes.Select(c => new Culture
                {
                    Name = CultureInfo.GetCultureInfo(c).Name,
                    DisplayName = CultureInfo.GetCultureInfo(c).DisplayName,
                    IsDefault = _localizationManager.GetDefaultCulture()
                     .Equals(CultureInfo.GetCultureInfo(c).Name, StringComparison.OrdinalIgnoreCase)
-               }).ToList();
-
-            if (cultures.Count == 0)
-            {
-                cultures.Add(new Culture { Name = "en", DisplayName = "English", IsDefault = true });
-            }
-
-            return cultures.OrderBy(item => item.DisplayName);
-        }
-
-        // GET: api/localization/neutral
-        [HttpGet("neutral")]
-        public IEnumerable<Culture> Get()
-        {
-            var cultureCodes = _localizationManager.GetNeutralCultures();
-
-            var cultures = cultureCodes.Select(c => new Culture
-            {
-                Name = CultureInfo.GetCultureInfo(c).Name,
-                DisplayName = CultureInfo.GetCultureInfo(c).DisplayName,
-                IsDefault = false
-            }).ToList();
-
-            if (cultures.Count == 0)
-            {
-                cultures.Add(new Culture { Name = "en", DisplayName = "English", IsDefault = false });
-            }
-
+               });
             return cultures.OrderBy(item => item.DisplayName);
         }
     }

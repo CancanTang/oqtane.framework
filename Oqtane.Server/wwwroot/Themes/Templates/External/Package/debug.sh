@@ -1,8 +1,3 @@
-#!/bin/bash
-
-TargetFramework=$1
-ProjectName=$2
-
-cp -f "../Client/bin/Debug/$TargetFramework/$ProjectName$.Client.Oqtane.dll" "../../[RootFolder]/Oqtane.Server/bin/Debug/$TargetFramework/"
-cp -f "../Client/bin/Debug/$TargetFramework/$ProjectName$.Client.Oqtane.pdb" "../../[RootFolder]/Oqtane.Server/bin/Debug/$TargetFramework/"
-cp -rf "../Client/wwwroot/"* "../../[RootFolder]/Oqtane.Server/wwwroot/_content/%ProjectName%/"
+cp -f "../Client/bin/Debug/net8.0/[Owner].Theme.[Theme].Client.Oqtane.dll" "../../oqtane.framework/Oqtane.Server/bin/Debug/net8.0/"
+cp -f "../Client/bin/Debug/net8.0/[Owner].Theme.[Theme].Client.Oqtane.pdb" "../../oqtane.framework/Oqtane.Server/bin/Debug/net8.0/"
+cp -rf "../Server/wwwroot/"* "../../oqtane.framework/Oqtane.Server/wwwroot/"

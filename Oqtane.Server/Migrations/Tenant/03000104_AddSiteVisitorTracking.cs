@@ -19,9 +19,9 @@ namespace Oqtane.Migrations.Tenant
             var siteEntityBuilder = new SiteEntityBuilder(migrationBuilder, ActiveDatabase);
 
             siteEntityBuilder.AddBooleanColumn("VisitorTracking", true);
-            siteEntityBuilder.UpdateData("VisitorTracking", true);
+            siteEntityBuilder.UpdateColumn("VisitorTracking", "1", "bool", "");
             siteEntityBuilder.AddBooleanColumn("CaptureBrokenUrls", true);
-            siteEntityBuilder.UpdateData("CaptureBrokenUrls", true);
+            siteEntityBuilder.UpdateColumn("CaptureBrokenUrls", "1", "bool", "");
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)

@@ -6,3 +6,6 @@ ie.
   /Radzen.Blazor
     /css
     /fonts
+  /syncfusion.blazor
+    /scripts
+    /styles

@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 
 namespace Oqtane.UI
 {
@@ -17,31 +16,13 @@ namespace Oqtane.UI
             _jsRuntime = jsRuntime;
         }
 
-        public async Task SetCookie(string name, string value, int days)
-        {
-            await SetCookie(name, value, days, true, "Lax");
-        }
-
-        public Task SetCookie(string name, string value, int days, bool secure, string sameSite)
+        public Task SetCookie(string name, string value, int days)
         {
             try
             {
                 _jsRuntime.InvokeVoidAsync(
                     "Oqtane.Interop.setCookie",
-                    name, value, days, secure, sameSite);
-                return Task.CompletedTask;
-            }
-            catch
-            {
-                return Task.CompletedTask;
-            }
-        }
-
-        public Task SetCookieString(string cookieString)
-        {
-            try
-            {
-                _jsRuntime.InvokeVoidAsync("Oqtane.Interop.setCookieString", cookieString);
+                    name, value, days);
                 return Task.CompletedTask;
             }
             catch
@@ -132,16 +113,11 @@ namespace Oqtane.UI
 
         public Task IncludeScript(string id, string src, string integrity, string crossorigin, string type, string content, string location)
         {
-            return IncludeScript(id, src, integrity, crossorigin, type, content, location, null);
-        }
-
-        public Task IncludeScript(string id, string src, string integrity, string crossorigin, string type, string content, string location, Dictionary<string, string> dataAttributes)
-        {
             try
             {
                 _jsRuntime.InvokeVoidAsync(
                     "Oqtane.Interop.includeScript",
-                    id, src, integrity, crossorigin, type, content, location, dataAttributes);
+                    id, src, integrity, crossorigin, type, content, location);
                 return Task.CompletedTask;
             }
             catch
@@ -224,21 +200,16 @@ namespace Oqtane.UI
 
         public Task UploadFiles(string posturl, string folder, string id, string antiforgerytoken, string jwt)
         {
-            UploadFiles(posturl, folder, id, antiforgerytoken, jwt, 1, false);
-            return Task.CompletedTask;
-        }
-
-        public ValueTask<bool> UploadFiles(string posturl, string folder, string id, string antiforgerytoken, string jwt, int chunksize, bool anonymizeuploadfilenames, CancellationToken cancellationToken = default)
-        {
             try
             {
-                return _jsRuntime.InvokeAsync<bool>(
-                    "Oqtane.Interop.uploadFiles", cancellationToken,
-                    posturl, folder, id, antiforgerytoken, jwt, chunksize, anonymizeuploadfilenames);
+                _jsRuntime.InvokeVoidAsync(
+                    "Oqtane.Interop.uploadFiles",
+                    posturl, folder, id, antiforgerytoken, jwt);
+                return Task.CompletedTask;
             }
             catch
             {
-                return new ValueTask<bool>(Task.FromResult(false));
+                return Task.CompletedTask;
             }
         }
 
@@ -417,30 +388,5 @@ namespace Oqtane.UI
                 return Task.CompletedTask;
             }
         }
-
-        public ValueTask<string> CreateCredential(string optionsResponse)
-        {
-            try
-            {
-                return _jsRuntime.InvokeAsync<string>("Oqtane.Interop.createCredential", optionsResponse);
-            }
-            catch
-            {
-                return new ValueTask<string>(Task.FromResult(string.Empty));
-            }
-        }
-
-        public ValueTask<string> RequestCredential(string optionsResponse)
-        {
-            try
-            {
-                return _jsRuntime.InvokeAsync<string>("Oqtane.Interop.requestCredential", optionsResponse);
-            }
-            catch
-            {
-                return new ValueTask<string>(Task.FromResult(string.Empty));
-            }
-        }
-
     }
 }

@@ -16,16 +16,6 @@ namespace Oqtane.Migrations
             OnDeleteAction = onDeleteAction;
         }
 
-        public ForeignKey(string name, Expression<Func<TEntityBuilder, object>> column, string principalTable, string principalColumn, string principalSchema, ReferentialAction onDeleteAction)
-        {
-            Name = name;
-            Column = column;
-            PrincipalTable = principalTable;
-            PrincipalColumn = principalColumn;
-            PrincipalSchema = principalSchema;
-            OnDeleteAction = onDeleteAction;
-        }
-
         public string Name { get; }
 
         public Expression<Func<TEntityBuilder, object>> Column { get;}
@@ -43,8 +33,6 @@ namespace Oqtane.Migrations
         public string PrincipalTable { get; }
 
         public string PrincipalColumn { get; }
-
-        public string PrincipalSchema { get; } = "";
 
 
     }
